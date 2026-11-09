@@ -46,7 +46,11 @@ jobs:
             name: Linux
     runs-on: ${{ matrix.os }}
     env:
-      CSC_IDENTITY_AUTO_DISCOVERY: false # unsigned builds; add signing certificates for production
+      CSC_IDENTITY_AUTO_DISCOVERY: false # no certificates; the Mac apps are signed ad hoc (identity "-")
+      # electron-builder skips all signing in pull-request builds unless this is set. Ad-hoc signing
+      # uses no certificate or secret, so it is safe, and PRs then get the same macOS signature check
+      # as releases. (Fork PRs never receive repository secrets.)
+      CSC_FOR_PULL_REQUEST: true
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
