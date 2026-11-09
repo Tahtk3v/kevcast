@@ -29,6 +29,11 @@ The next visit to `/admin/` asks you to create the account again. Content and sc
 
 ## Screens
 
+### macOS says KevCast Player or Studio "is damaged" / "is beschadigd"
+This happens with versions before 0.2.2, which weren't signed at all. The app isn't actually damaged. Either:
+- install the latest release, which shows the normal **Open Anyway** option (see [first start on a Mac](studio.md#first-start-on-a-mac)), or
+- run once in Terminal, then open the app: `xattr -cr "/Applications/KevCast Studio.app"` (or `KevCast Player.app`).
+
 ### The player can't find the server
 Automatic discovery uses UDP broadcast on port 41234. It doesn't cross routers or VLANs, and some Wi-Fi networks block it.
 - Type the address on the connect screen instead (e.g. `192.168.1.20`; port 8080 is assumed).

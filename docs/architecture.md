@@ -122,7 +122,7 @@ A client sends the UDP datagram `KEVCAST_DISCOVER` to port 41234 on:
 
 Each server replies to the sender with JSON:
 ```json
-{ "kevcast": true, "id": "server-instance-id", "name": "Acme HQ", "version": "0.2.1", "port": 8080, "urls": ["http://192.168.1.20:8080"] }
+{ "kevcast": true, "id": "server-instance-id", "name": "Acme HQ", "version": "0.2.2", "port": 8080, "urls": ["http://192.168.1.20:8080"] }
 ```
 The client uses the address the reply came from, de-duplicates by `id`, and prefers a LAN address over loopback.
 

@@ -12,6 +12,18 @@ Use whichever you prefer; both always show the same data.
 | macOS | `KevCast-Studio-x.y.z-mac-*.dmg` |
 | Linux | `.deb` or `.AppImage` |
 
+### First start on a Mac
+KevCast's Mac apps are not yet signed with an Apple Developer certificate, so macOS asks for confirmation the first time:
+1. Open the `.dmg` and drag the app to **Applications**.
+2. Open the app. macOS says it can't verify the developer. Click **Done** (or **OK**).
+3. Open **System Settings → Privacy & Security**, scroll down to the message about the app, and click **Open Anyway**. Confirm with your password.
+
+You only do this once. If macOS says the app **is damaged** (Dutch: *"is beschadigd"*), you have a
+version from before 0.2.2. Install the latest release, or run this once in Terminal:
+```bash
+xattr -cr "/Applications/KevCast Studio.app"
+```
+
 ## Connecting
 
 At first start Studio searches the network and lists every KevCast server it finds, with the

@@ -46,7 +46,11 @@ jobs:
             name: Linux
     runs-on: ${{ matrix.os }}
     env:
-      CSC_IDENTITY_AUTO_DISCOVERY: false # unsigned builds; add signing certificates for production
+      CSC_IDENTITY_AUTO_DISCOVERY: false # no certificates; the Mac apps are signed ad hoc (identity "-")
+      # electron-builder skips all signing in pull-request builds unless this is set. Ad-hoc signing
+      # uses no certificate or secret, so it is safe, and PRs then get the same macOS signature check
+      # as releases. (Fork PRs never receive repository secrets.)
+      CSC_FOR_PULL_REQUEST: true
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
@@ -60,6 +64,18 @@ jobs:
           npm ci
           npx electron-builder --config electron-builder.player.yml --publish never
           npx electron-builder --config electron-builder.studio.yml --publish never
+
+      - name: Check the macOS apps are signed (unsigned apps show as "damaged")
+        if: runner.os == 'macOS'
+        run: |
+          found=0
+          for app in desktop/dist/*/mac*/*.app; do
+            found=1
+            echo "== $app"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            codesign -dv "$app" 2>&1 | grep -E "Signature|Identifier|Format"
+          done
+          [ "$found" = 1 ] || { echo "::error::No .app bundles found to check"; exit 1; }
 
       - name: Build Windows installers (KevCast Setup + KevCast Server Setup)
         if: runner.os == 'Windows'

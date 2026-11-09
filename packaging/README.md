@@ -35,7 +35,7 @@ At install time:
 The NSIS script also compiles on Linux (`apt install nsis`), which is handy for checking syntax:
 ```bash
 node packaging/stage-server.js --platform win --arch x64 --out /tmp/stage --skip-poppler
-makensis -DVERSION=0.2.1 -DOUTFILE=/tmp/setup.exe -DSERVER_DIR=/tmp/stage \
+makensis -DVERSION=0.2.2 -DOUTFILE=/tmp/setup.exe -DSERVER_DIR=/tmp/stage \
   -DASSETS=$PWD/packaging/assets -DSCRIPTS=$PWD/packaging/windows packaging/windows/kevcast-setup.nsi
 ```
 

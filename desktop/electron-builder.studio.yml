@@ -28,6 +28,13 @@ msi:
   perMachine: true
   runAfterFinish: true
 mac:
+  # No Apple Developer certificate yet: sign ad hoc ("-"). An unsigned Apple-silicon app is reported
+  # as "damaged" by macOS with no way to open it; an ad-hoc signed one gets the normal
+  # "unidentified developer" warning with "Open Anyway" in System Settings → Privacy & Security.
+  # Ad-hoc signing requires hardenedRuntime off. Replace with a Developer ID + notarization for production.
+  identity: "-"
+  hardenedRuntime: false
+  gatekeeperAssess: false
   icon: build/studio.png
   category: public.app-category.productivity
   target:
