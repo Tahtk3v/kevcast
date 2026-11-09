@@ -25,12 +25,22 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - **Week overview**: one row per day showing exactly what a screen plays, including its default playlist and recurring items.
 - **Weekly restart** of Player app screens (default Sunday 03:00, configurable per display). Windows restarts the computer so updates install. `rebootCommand` and `weeklyRestart` are available in `player.json`.
 - Screenshots throughout the documentation and the README.
+- **Display groups**:
+  - A Groups page: create, colour, rename and delete groups, and add or remove screens.
+  - Each group has its own page showing its screens, a week overview and its schedule entries.
+  - Group actions: Schedule for this group, Send to group, Set default playlist, Identify, Reload, and **Copy schedule to…** other groups.
+  - A screen can be in **several groups**. Existing single-group data is migrated automatically.
+- **Displays page**: select several screens, then *Add to group / Remove from group / Set default playlist / Send / Schedule*. Filter by group.
+- **Schedule tables**: select several entries, then *Enable / Disable / Change screens / Priority / Remove*. The schedule views can filter on a whole group.
+- **KevCast Studio, This computer**: browse quick folders (Desktop, Documents, Downloads, OneDrive, drives, recent folders), see which files are already uploaded, and upload with progress. Includes a native **Browse…** dialog. Uploads stream from disk.
+- **File → Upload files…** (Ctrl/Cmd+U) in Studio. A playlist's **Upload** button adds the uploaded files to that playlist.
 
 ### Changed
 - Players check the schedule every 5 seconds (was 15), and resume a playlist where it left off after an interruption.
 - A single web page that stays on screen is no longer reloaded each time its duration ends.
 
 ### Fixed
+- Removing a display (or group) that was the only target of a schedule entry turned that entry into "all displays". Such entries are now removed.
 - The Windows MSI build failed because no application icon was set.
 - Web pages appeared only after an 8-second delay on players.
 

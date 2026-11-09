@@ -7,7 +7,8 @@ Changes reach the screens within seconds. Nothing needs a "publish" button.
 - [Media](#media)
 - [Playlists](#playlists)
 - [Schedule](#schedule)
-- [Displays and groups](#displays-and-groups)
+- [Displays](#displays)
+- [Groups](#groups)
 - [Send to screens](#send-to-screens)
 - [Settings](#settings)
 - [Tips for good-looking screens](#tips-for-good-looking-screens)
@@ -163,6 +164,18 @@ Click **Add to schedule**, drag on the calendar, or use **Schedule** on a playli
 3. Set **Show each item for**: how long the page stays up before the next scheduled content. With a single web page, this only matters together with *Repeat within this time*.
 4. Choose the screens and the time, for example weekdays 07:00–09:30 with *Repeat within this time: every 15 minutes, 60 seconds*.
 
+### Changing many entries at once
+
+![Bulk schedule actions](images/schedule-bulk.png)
+
+Tick entries in the table under the calendar, or on a group's page; the header checkbox selects all. Then:
+- **Enable** / **Disable**
+- **Change screens…**: set the screens and groups of all selected entries in one go
+- **Priority…**
+- **Remove**
+
+The calendar's screen filter (top right) can also show a whole **group** (▦), in both the calendar and the week overview.
+
 ### Which entry wins?
 When more than one entry is active for a screen at the same moment:
 1. The **highest priority** wins (Urgent > High > Normal).
@@ -175,7 +188,7 @@ After an interruption, a playlist continues where it left off.
 
 Screens carry a copy of the schedule, so switches happen on time even when the server is unreachable.
 
-## Displays and groups
+## Displays
 
 ### Adding a display
 
@@ -186,13 +199,27 @@ Screens carry a copy of the schedule, so switches happen on time even when the s
 3. Click **Add display** and fill in:
    - the code
    - a name (e.g. *Reception TV*)
-   - optionally a group (e.g. *Ground floor*)
+   - optionally one or more groups (e.g. *Lobby*); click a group to select it, or type a new name and click **Add**
    - a default playlist
 4. Click **Connect display**.
 
 For many screens at once, skip pairing with a [provisioning key](rollout.md).
 
+### Selecting many screens
+
+![Selecting screens](images/displays-select.png)
+
+Tick the box on display cards, or use **Select all**, to change several screens at once. The bar that appears lets you:
+- **Add to group…**, including **+ New group…**
+- **Remove from group…**
+- **Set default playlist**
+- **Send to these** / **Schedule** for exactly the selected screens
+- **Identify**
+
+The chips above the cards filter by group (**All**, each group, **No group**).
+
 ### The display card
+- A checkbox to select it, the name, and its **group badges**. Click a badge to open that group.
 - Online status, plus an **App** or **Browser** badge.
 - A live preview: the latest **screenshot** for app players, otherwise the current slide.
 - What is scheduled now, the default playlist (change it right there), resolution and IP address.
@@ -210,7 +237,8 @@ For many screens at once, skip pairing with a [provisioning key](rollout.md).
 
 | Setting | Options |
 |---|---|
-| Name, group, notes | Free text. Type a new group name to create a group. |
+| Name, notes | Free text |
+| Groups | Click groups to add or remove this screen; type a new name and click **Add** to create a group |
 | Default playlist | Plays when nothing is scheduled |
 | Orientation | Landscape, Portrait ⟲ or Portrait ⟳. Use portrait for a TV mounted on its side; the content is rotated for you. |
 | Image fit | **Fit** shows everything (black bars if the shape differs). **Fill** crops to fill the screen. |
@@ -220,11 +248,49 @@ For many screens at once, skip pairing with a [provisioning key](rollout.md).
 | Weekly restart | **On by default: every Sunday at 03:00.** For screens running the KevCast Player app. On **Windows** the computer restarts, so pending Windows updates get installed. On macOS and Linux the player app restarts (see [player docs](player.md#weekly-restart)). Choose another day or time, or switch it off. |
 | Remove | Disconnects the screen. It shows a new pairing code. |
 
-### Groups
-The Displays page is organised by group. Each group header has these actions:
-- **Send to group** (see below)
-- **Identify** and **Reload** for every screen in the group
-- **Rename**, which also updates schedules that target the group
+## Groups
+
+![Groups](images/groups.png)
+
+Groups make it easy to manage many screens at once: *Lobby*, *Canteen*, *Floor 2*, *Meeting rooms*…
+Anything scheduled for a group plays on **every screen in it**. Adding a screen to a group immediately gives it the group's schedule.
+A screen can be in **several groups**: a meeting-room screen can be in both *Floor 2* and *Meeting rooms*.
+
+### Creating a group
+Click **New group**. Give it a name, a colour and an optional description, then tick the screens that belong in it.
+
+![New group](images/group-dialog.png)
+
+You can also create groups on the fly:
+- the **Add to group… → + New group…** action on the Displays page
+- the group picker in the *Add display* and *Display settings* dialogs
+
+### A group's page
+
+![A group](images/group-detail.png)
+
+Click a group to open it:
+
+| Part | What you can do |
+|---|---|
+| **Screens** | See every member online or offline, with what it's showing. **Add or remove** members, or remove one with ✕. |
+| **What this group plays this week** | A [week overview](#week-overview) of everything scheduled for the group, including recurring ↻ items |
+| **Schedule entries for this group** | The group's own schedule. Click to edit; tick several to change them [all at once](#changing-many-entries-at-once). |
+| **Schedule for this group** | Opens the schedule dialog with this group already selected |
+| **Send to group** | Make a playlist the default, take over now, or schedule it ([Send to screens](#send-to-screens)) |
+| **Set default playlist** | Sets the default playlist of every screen in the group |
+| **Identify / Reload** | For all screens in the group |
+| **Copy schedule to…** | Copies all of this group's schedule entries to other groups, e.g. to set up *Floor 3* like *Floor 2*. The copies can be changed separately afterwards. |
+| **Edit group** | Rename (schedules stay attached), change the colour or description, or **Delete** |
+
+Deleting a group never deletes screens. Schedule entries aimed **only** at that group are removed, so they can't turn into
+"all displays" by accident. Entries that also target other screens or groups keep those.
+
+### Updating many screens at once: summary
+- **Schedule a group**: one entry plays on all members. Change it once and every member updates.
+- **Change many entries at once**: tick entries in any schedule table (see [below](#changing-many-entries-at-once)).
+- **Move screens between groups**: tick them on the Displays page → *Add to group…* / *Remove from group…*.
+- **Same schedule on another group**: *Copy schedule to…* on the group's page.
 
 ## Send to screens
 

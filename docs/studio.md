@@ -27,12 +27,38 @@ IT can preset the server with `studio.json` (same folders as [`player.json`](rol
 
 | Menu | Item | Shortcut |
 |---|---|---|
-| File | Upload media… | Ctrl/Cmd+U |
+| File | Upload files… (opens the file dialog) | Ctrl/Cmd+U |
 | File | New playlist | Ctrl/Cmd+N |
 | File | Connect to another server… / Recent servers / Open in web browser | |
-| Go | Dashboard · Media · Playlists · Schedule · Displays & groups | Ctrl/Cmd+1 … 5 |
+| Go | Dashboard · Media · Playlists · Schedule · Displays · Groups | Ctrl/Cmd+1 … 6 |
 | Go | Settings | Ctrl/Cmd+, |
 | View | Reload, zoom, full screen, developer tools | |
+
+## Uploading from this computer
+
+Studio can reach the files on your computer, which the browser version can't.
+On the **Media** page you'll find a **This computer** panel:
+
+![This computer](images/studio-this-computer.png)
+
+| Part | What it does |
+|---|---|
+| **Quick folders** (left) | Desktop, Documents, Downloads, Pictures, Videos, OneDrive (personal and business), your home folder and USB/network drives, plus **recent folders** you uploaded from |
+| **Other folder…** | Open any folder with the system's folder dialog |
+| **File list** | Only what KevCast can show: PowerPoint (`.pptx .ppt .ppsx .odp…`), PDF, images and videos, newest first. Folders open with a click; the **‹** button goes up a folder. |
+| **Uploaded** badge | This file (same name and size) is already in the library |
+| **Upload N files** | Uploads the ticked files, with a progress bar per file. **Double-click** a file to upload just that one straight away. |
+| **Browse…** | The normal Windows/macOS file dialog, filtered to supported files, with multi-select |
+
+Studio remembers the last folder you used and opens there next time.
+
+Other ways to upload in Studio:
+- **File → Upload files…** (Ctrl/Cmd+U) from anywhere
+- **Drag files** from Explorer or Finder onto the window
+- **Upload** in a playlist's library panel: the files are uploaded **and added to that playlist** in one step (this works in the browser too)
+
+Files are streamed straight from disk to the server, so large videos upload fine. Uploading only reads the files you choose;
+Studio never changes or deletes anything on your computer.
 
 ## Working in Studio
 

@@ -21,14 +21,20 @@ KevCast takes its inspiration from EasyScreen and is a simpler alternative to Xi
   - Schedule a playlist, a single item or a web page.
   - Repeat weekly, every N weeks, monthly or once, valid for a period.
   - Show something **every 15 minutes for 60 seconds**, and set how long each item stays on screen.
-- **Display groups and "Send to screens".** Put a playlist on a whole floor in two clicks: make it the default, take over now, or schedule it.
+- **Display groups.**
+  - Create groups like *Lobby* or *Floor 2* and tick screens to add them. A screen can be in several groups.
+  - Anything scheduled for a group plays on all its screens.
+  - Copy a group's schedule to another group, and change many schedule entries at once.
+  - **Send to screens** puts a playlist on a whole floor in two clicks.
 - **KevCast Player app** for Windows, macOS, Linux and Raspberry Pi:
   - finds the server by itself
   - runs as a fullscreen kiosk that only closes with **Alt+Q**
   - **stores the whole schedule locally** and keeps playing when the server is down
   - recovers from crashes and sends screenshots back
   - **restarts every Sunday** so Windows updates get installed
-- **KevCast Studio**: a desktop app to manage everything. The same **Web Studio** is also in any browser.
+- **KevCast Studio**: a desktop app to manage everything.
+  - Browse the folders on your computer (Desktop, Documents, OneDrive…) and upload PowerPoints with a click.
+  - The same **Web Studio** is also in any browser.
 - **Zero-touch roll-out.** Deploy the MSI or .deb plus a `player.json` with GPO, Intune, MDM or Ansible. Screens appear already approved, named and grouped.
 - **Easy to install.** Separate installers for Server, Player and Studio, plus a Windows setup that lets you choose. No Docker, no database server, no licences.
 
@@ -39,6 +45,7 @@ KevCast takes its inspiration from EasyScreen and is a simpler alternative to Xi
 | ![Dashboard](docs/images/dashboard.png) **Dashboard**: every screen and what it shows right now | ![Media](docs/images/media.png) **Media**: PowerPoint, images, video, web pages and text slides |
 | ![Playlist editor](docs/images/playlist-editor.png) **Playlists**: drag in media, set the time per item | ![Calendar](docs/images/schedule-calendar.png) **Schedule**: drag on the calendar; ↻ items repeat |
 | ![Schedule dialog](docs/images/schedule-dialog-webpage.png) **Schedule a web page** every 15 minutes for 60 seconds | ![Displays](docs/images/displays.png) **Displays & groups** with live screenshots and offline status |
+| ![Groups](docs/images/group-detail.png) **Groups**: screens, week plan and schedule of a whole group | ![This computer](docs/images/studio-this-computer.png) **KevCast Studio**: upload PowerPoints straight from your folders |
 | ![PowerPoint on a screen](docs/images/player-slide.png) **On screen**: a PowerPoint slide | ![Web page on a screen](docs/images/player-webpage.png) **On screen**: a live departures page |
 
 ## Get started

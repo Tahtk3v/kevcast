@@ -6,7 +6,9 @@ KevCast is self-hosted narrowcasting (digital signage). You install one server. 
 | I want to… | Read |
 |---|---|
 | Install the server on Windows, Linux or macOS | [Installation](installation.md) |
-| Learn the admin: media, playlists, schedule, displays | [User guide](user-guide.md) |
+| Learn the admin: media, playlists, schedule, displays, groups | [User guide](user-guide.md) |
+| Put screens in groups and update their schedule at once | [User guide → Groups](user-guide.md#groups) |
+| Upload PowerPoints from your computer with KevCast Studio | [KevCast Studio](studio.md#uploading-from-this-computer) |
 | Set up a screen with the Player app or a browser | [KevCast Player](player.md) |
 | Use the desktop management app | [KevCast Studio](studio.md) |
 | Deploy many screens at once (GPO, Intune, MDM, Ansible) | [Enterprise roll-out](rollout.md) |

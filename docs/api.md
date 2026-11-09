@@ -77,6 +77,7 @@ An item looks like `{ mediaId, duration, transition?, enabled?, mute? }`:
 | POST | `/api/schedules` | entry | The entry |
 | PUT | `/api/schedules/:id` | entry | The entry |
 | DELETE | `/api/schedules/:id` | – | `{ ok }` |
+| POST | `/api/schedules/bulk` | `{ ids: [], action: 'enable'\|'disable'\|'delete'\|'setTargets'\|'priority', targets?, priority? }` | `{ changed }` |
 
 ```json
 {
@@ -117,13 +118,13 @@ An item looks like `{ mediaId, duration, transition?, enabled?, mute? }`:
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | GET | `/api/displays` | – | List with `online`, `scheduledPlaylistId`, `scheduleId`, `nowPlaying`, `cache`, `screenshotAt` (tokens are never returned) |
-| POST | `/api/displays/pair` | `{ code, name?, group?, defaultPlaylistId? }` | The approved display |
-| PATCH | `/api/displays/:id` | Any of `{ name, group, defaultPlaylistId, orientation, fit, showClock, ticker, background, notes, maintenance }` | The display |
-| PATCH | `/api/displays/bulk` | `{ ids?: [], group?: "name", all?: true, patch: { group, defaultPlaylistId, orientation, fit, showClock, ticker, background, maintenance } }` | `{ updated }` |
+| POST | `/api/displays/pair` | `{ code, name?, groups?: [], defaultPlaylistId? }` | The approved display |
+| PATCH | `/api/displays/:id` | Any of `{ name, groups, defaultPlaylistId, orientation, fit, showClock, ticker, background, notes, maintenance }` | The display |
+| PATCH | `/api/displays/bulk` | `{ ids?: [], group?: "name", all?: true, addGroups?: [], removeGroups?: [], patch: { groups, defaultPlaylistId, orientation, fit, showClock, ticker, background, maintenance } }` | `{ updated }` |
 | POST | `/api/displays/:id/identify` · `/reload` · `/screenshot` | – | `{ delivered }`: 1 if the screen is online |
 | POST | `/api/displays/command` | `{ action: 'identify'\|'reload'\|'screenshot', ids?, group?, all? }` | `{ targeted, delivered }` |
 | GET | `/api/displays/:id/screenshot` | – | Latest JPEG screenshot (404 if none) |
-| DELETE | `/api/displays/:id` | – | Unpairs the screen (it shows a new code) |
+| DELETE | `/api/displays/:id` | – | Unpairs the screen (it shows a new code). Entries aimed only at this screen are removed: `{ removedSchedules }`. |
 
 Example: update the news ticker on every screen in a group.
 ```bash
@@ -131,6 +132,19 @@ curl -b kc.txt -X PATCH -H 'Content-Type: application/json' \
   -d '{"group":"Canteen","patch":{"ticker":{"enabled":true,"text":"Soup of the day: tomato\nFire drill at 14:00","speed":60}}}' \
   http://server:8080/api/displays/bulk
 ```
+
+## Groups (admin)
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| GET | `/api/groups` | – | `[{ id, name, color, description, displayIds, members, online, schedules }]` |
+| POST | `/api/groups` | `{ name, color?, description?, displayIds? }` | The group (409 if the name exists) |
+| PATCH | `/api/groups/:id` | `{ name?, color?, description? }` | The group. Renaming updates the members and schedule entries. |
+| POST | `/api/groups/:id/members` | `{ add?: [displayId], remove?: [displayId] }` | The group |
+| POST | `/api/groups/:id/copy-schedule` | `{ toGroupIds: [id] }` | `{ copied }`: copies of all entries aimed at this group |
+| DELETE | `/api/groups/:id` | – | `{ removedSchedules }`. Members leave the group; entries aimed only at it are deleted. |
+
+A display can be in several groups: `display.groups` is an array of names. Schedule entries target groups by name.
 
 ## Player API (display token)
 

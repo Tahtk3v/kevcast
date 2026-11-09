@@ -42,7 +42,8 @@ playlists: { id, name, color, defaultDuration, transition, items: [{ id, mediaId
 schedules: { id, name, playlistId | mediaId, itemDuration, enabled, priority, repeat: 'weekly'|'monthly'|'once',
              days[], everyWeeks, monthDay, allDay, start, end, startDate, endDate,
              interval: { everyMinutes, showSeconds } | null, targets: { displays: [id], groups: [name] } }
-displays:  { id, name, group, approved, pairingCode, token, defaultPlaylistId, orientation, fit, background,
+groups:    { id, name, color, description }
+displays:  { id, name, groups: [name], approved, pairingCode, token, defaultPlaylistId, orientation, fit, background,
              showClock, ticker{}, maintenance{ weeklyRestart, day, time }, lastSeen, ip, resolution, userAgent,
              nowPlaying{}, cache{}, screenshotAt }
 ```
