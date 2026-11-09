@@ -45,6 +45,7 @@
     left: '<path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>',
     right: '<path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>',
     eye: '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/>',
+    group: '<path d="M4 5h7v6H4zm9 0h7v6h-7zM4 13h7v6H4zm9 0h7v6h-7z"/>',
     refresh: '<path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z"/>',
   };
   const icon = (name) => {
@@ -98,6 +99,7 @@
     playlists: [],
     schedules: [],
     displays: [],
+    groups: [],
     overview: null,
     uploads: [],
     mediaFilter: 'all',
@@ -108,10 +110,10 @@
   };
 
   async function loadAll() {
-    const [media, playlists, schedules, displays, overview] = await Promise.all([
-      api('/media'), api('/playlists'), api('/schedules'), api('/displays'), api('/overview'),
+    const [media, playlists, schedules, displays, overview, groups] = await Promise.all([
+      api('/media'), api('/playlists'), api('/schedules'), api('/displays'), api('/overview'), api('/groups'),
     ]);
-    Object.assign(state, { media, playlists, schedules, displays, overview });
+    Object.assign(state, { media, playlists, schedules, displays, overview, groups });
   }
 
   const byId = (list, id) => list.find((x) => x.id === id);
@@ -142,6 +144,7 @@
     ['playlists', 'Playlists', 'playlist'],
     ['schedule', 'Schedule', 'schedule'],
     ['displays', 'Displays', 'display'],
+    ['groups', 'Groups', 'group'],
     ['settings', 'Settings', 'settings'],
   ];
   const route = () => {
@@ -198,7 +201,7 @@
     if (!el) return;
     const { page, arg } = route();
     const scroll = window.scrollY;
-    const view = { dashboard: Dashboard, media: MediaPage, playlists: PlaylistsPage, schedule: SchedulePage, displays: DisplaysPage, settings: SettingsPage }[page];
+    const view = { dashboard: Dashboard, media: MediaPage, playlists: PlaylistsPage, schedule: SchedulePage, displays: DisplaysPage, groups: GroupsPage, settings: SettingsPage }[page];
     el.replaceChildren(...[].concat(view(arg)).flat(Infinity).filter(Boolean));
     if (opts.soft) window.scrollTo(0, scroll);
   }
@@ -366,15 +369,40 @@
   // ---------------------------------------------------------------------------
   const ACCEPT = 'image/*,video/*,.pdf,.ppt,.pptx,.pps,.ppsx,.pot,.potx,.odp,.key';
 
-  function pickFiles() {
+  // Inside KevCast Studio the page gets `window.kevcastStudio` (desktop/studio/preload.js):
+  // native file dialog, local folder browsing and uploads streamed from disk.
+  const studio = window.kevcastStudio || null;
+
+  /** Choose files to upload. opts.addTo = a playlist to add the uploaded items to. */
+  function pickFiles(opts = {}) {
+    if (studio) {
+      studio.pickFiles().then((files) => { if (files.length) uploadLocal(files.map((f) => f.path), opts); });
+      return;
+    }
     const inp = h('input', { type: 'file', multiple: true, accept: ACCEPT });
-    inp.onchange = () => uploadFiles([...inp.files]);
+    inp.onchange = () => uploadFiles([...inp.files], opts);
     inp.click();
   }
+  window.__kevcastPickFiles = () => pickFiles();
 
-  function uploadFiles(files) {
+  /** After uploading: refresh, and add the new items to a playlist when asked. */
+  async function afterUpload(created, opts) {
+    state.media = await api('/media');
+    if (opts.addTo && created.length) {
+      const p = byId(state.playlists, opts.addTo.id) || opts.addTo;
+      p.items.push(...created.map((m) => ({ mediaId: m.id, duration: 0, enabled: true })));
+      const saved = await api(`/playlists/${p.id}`, { method: 'PUT', body: { items: p.items } });
+      p.items = saved.items;
+      toast(`Added ${created.length} item${created.length === 1 ? '' : 's'} to “${p.name}”`, 'ok');
+    }
+    if (['media', 'playlists'].includes(route().page)) renderPage({ soft: true });
+  }
+
+  function uploadFiles(files, opts = {}) {
     if (!files.length) return;
-    if (route().page !== 'media') go('#/media');
+    if (!opts.addTo && route().page !== 'media') go('#/media');
+    const created = [];
+    let pending = files.length;
     for (const file of files) {
       const u = { name: file.name, progress: 0, done: false, error: null };
       state.uploads.push(u);
@@ -389,16 +417,108 @@
         try { res = JSON.parse(xhr.responseText); } catch {}
         if (xhr.status >= 400) u.error = res.error || 'Upload failed';
         else if (res.rejected?.length) u.error = 'This file type is not supported';
-        else toast(`Uploaded ${file.name}${/\.(pptx?|ppsx?|potx?|odp|key|pdf)$/i.test(file.name) ? ' — converting slides…' : ''}`, 'ok');
+        else { created.push(...(res.created || [])); toast(`Uploaded ${file.name}${/\.(pptx?|ppsx?|potx?|odp|key|pdf)$/i.test(file.name) ? ' — converting slides…' : ''}`, 'ok'); }
         if (u.error) toast(`${file.name}: ${u.error}`, 'err');
         setTimeout(() => { state.uploads = state.uploads.filter((x) => x !== u); drawUploads(); }, u.error ? 5000 : 800);
-        state.media = await api('/media');
-        if (route().page === 'media') renderPage({ soft: true });
+        if (--pending === 0) afterUpload(created, opts); else { state.media = await api('/media'); if (route().page === 'media') renderPage({ soft: true }); }
       };
-      xhr.onerror = () => { u.done = true; u.error = 'Network error'; drawUploads(); };
+      xhr.onerror = () => { u.done = true; u.error = 'Network error'; drawUploads(); if (--pending === 0) afterUpload(created, opts); };
       xhr.send(fd);
     }
     drawUploads();
+  }
+
+  /** KevCast Studio: upload files from this computer by path (streamed by the app). */
+  async function uploadLocal(paths, opts = {}) {
+    if (!paths.length) return;
+    if (!opts.addTo && route().page !== 'media') go('#/media');
+    const rows = new Map(paths.map((p) => [p, { name: p.split(/[\\/]/).pop(), progress: 0, done: false, error: null }]));
+    rows.forEach((u) => state.uploads.push(u));
+    drawUploads();
+    const off = studio.onUploadProgress((ev) => {
+      const u = rows.get(ev.path);
+      if (!u) return;
+      u.progress = ev.size ? ev.loaded / ev.size : 1;
+      if (ev.status === 'done') { u.done = true; u.progress = 1; toast(`Uploaded ${u.name}${/\.(pptx?|ppsx?|potx?|odp|key|pdf)$/i.test(u.name) ? ' — converting slides…' : ''}`, 'ok'); }
+      if (ev.status === 'error') { u.done = true; u.error = ev.error; toast(`${u.name}: ${ev.error}`, 'err'); }
+      drawUploads();
+    });
+    let created = [];
+    try { created = await studio.upload(paths); } catch (e) { toast(e.message, 'err'); }
+    off();
+    setTimeout(() => { state.uploads = state.uploads.filter((x) => ![...rows.values()].includes(x) || x.error); drawUploads(); }, 900);
+    setTimeout(() => { state.uploads = state.uploads.filter((x) => ![...rows.values()].includes(x)); drawUploads(); }, 6000);
+    await afterUpload(created, opts);
+    if (state.local) state.local.selected.clear();
+  }
+
+  // --- "This computer" panel (KevCast Studio only) -------------------------------
+  const FILE_ICON = { presentation: 'presentation', image: 'image', video: 'video' };
+  function localPanel() {
+    const L = state.local || (state.local = { open: true, dir: null, listing: null, places: null, selected: new Set(), loading: false });
+    const box = h('div', { class: 'card local' });
+    const fmtDate = (ms) => new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    const uploaded = (f) => state.media.some((m) => m.originalName === f.name && m.size === f.size);
+    const open = async (dir) => {
+      L.loading = true; draw();
+      const r = await studio.list(dir);
+      L.loading = false;
+      if (r.error) { toast(r.error, 'err'); draw(); return; }
+      L.dir = r.path; L.listing = r; L.selected.clear();
+      studio.rememberFolder(r.path);
+      draw();
+    };
+    const draw = () => {
+      if (!L.open) {
+        box.replaceChildren(h('div', { class: 'section-head' }, icon('display'), h('h3', {}, 'This computer'), h('div', { class: 'spacer' }),
+          h('button', { class: 'btn sm', onclick: () => pickFiles() }, icon('upload'), 'Browse…'),
+          h('button', { class: 'btn sm ghost', onclick: () => { L.open = true; draw(); } }, 'Show')));
+        return;
+      }
+      const lst = L.listing;
+      const places = L.places || { places: [], recent: [] };
+      const crumbs = lst ? lst.path.split(/[\\/]/).filter(Boolean) : [];
+      const sep = lst && lst.path.includes('\\') ? '\\' : '/';
+      const sel = [...L.selected];
+      box.replaceChildren(
+        h('div', { class: 'section-head' }, icon('display'), h('h3', {}, 'This computer'),
+          h('span', { class: 'muted small' }, 'Pick PowerPoints, PDFs, images and videos from your computer'),
+          h('div', { class: 'spacer' }),
+          h('button', { class: 'btn sm', onclick: () => pickFiles() }, icon('upload'), 'Browse…'),
+          h('button', { class: 'btn sm ghost', onclick: () => { L.open = false; draw(); } }, 'Hide')),
+        h('div', { class: 'local-body' },
+          h('div', { class: 'local-places' },
+            places.places.map((p) => h('button', { class: `local-place ${lst && lst.path === p.path ? 'on' : ''}`, onclick: () => open(p.path) }, p.label)),
+            places.recent.length ? [h('div', { class: 'muted small', style: { margin: '10px 10px 4px' } }, 'Recent folders'),
+              places.recent.map((p) => h('button', { class: `local-place ${lst && lst.path === p.path ? 'on' : ''}`, title: p.path, onclick: () => open(p.path) }, p.label))] : null,
+            h('button', { class: 'local-place', onclick: async () => { const d = await studio.pickFolder(); if (d) open(d); } }, 'Other folder…')),
+          h('div', { class: 'local-main' },
+            lst ? h('div', { class: 'local-crumbs' },
+              h('button', { class: 'btn sm icon', title: 'Up one folder', disabled: !lst.parent, onclick: () => open(lst.parent) }, icon('left')),
+              h('span', { class: 'small', title: lst.path }, crumbs.slice(-3).join(` ${sep === '/' ? '›' : '›'} `) || lst.path)) : null,
+            L.loading ? h('div', { class: 'empty small' }, 'Loading…') : !lst ? h('div', { class: 'empty small' }, 'Pick a folder on the left.') :
+              h('div', { class: 'local-list' },
+                lst.dirs.map((d) => h('div', { class: 'local-row dir', ondblclick: () => open(d.path), onclick: () => open(d.path) },
+                  h('span', { class: 'local-ico' }, '📁'), h('span', { class: 'local-name' }, d.name))),
+                lst.files.map((f) => h('label', { class: `local-row ${L.selected.has(f.path) ? 'picked' : ''}`, ondblclick: () => uploadLocal([f.path]) },
+                  h('input', { type: 'checkbox', checked: L.selected.has(f.path), onchange: (e) => { e.target.checked ? L.selected.add(f.path) : L.selected.delete(f.path); draw(); } }),
+                  h('span', { class: 'local-ico' }, icon(FILE_ICON[f.type] || 'media')),
+                  h('span', { class: 'local-name', title: f.path }, f.name),
+                  uploaded(f) ? h('span', { class: 'badge ok' }, 'Uploaded') : null,
+                  h('span', { class: 'muted small' }, fmtSize(f.size)),
+                  h('span', { class: 'muted small', style: { minWidth: '92px', textAlign: 'right' } }, fmtDate(f.mtime)))),
+                !lst.dirs.length && !lst.files.length ? h('div', { class: 'empty small' }, 'No PowerPoints, PDFs, images or videos in this folder.') : null),
+            h('div', { class: 'local-foot' },
+              h('span', { class: 'muted small' }, lst ? `${lst.files.length} file${lst.files.length === 1 ? '' : 's'} · double-click a file to upload it straight away` : ''),
+              h('div', { class: 'spacer' }),
+              lst && lst.files.length ? h('button', { class: 'btn sm ghost', onclick: () => { lst.files.forEach((f) => L.selected.add(f.path)); draw(); } }, 'Select all') : null,
+              h('button', { class: 'btn primary sm', disabled: !sel.length, onclick: () => uploadLocal(sel) }, icon('upload'), sel.length ? `Upload ${sel.length} file${sel.length === 1 ? '' : 's'}` : 'Upload')))));
+    };
+    draw();
+    if (!L.places) {
+      studio.places().then((p) => { L.places = p; if (!L.dir) open(p.lastFolder); else draw(); });
+    }
+    return box;
   }
 
   function drawUploads() {
@@ -438,10 +558,11 @@
       pageHead('Media', 'Everything you can show on a screen.',
         h('button', { class: 'btn', onclick: () => webDialog() }, icon('web'), 'Web page'),
         h('button', { class: 'btn', onclick: () => textDialog() }, icon('text'), 'Text slide'),
-        h('button', { class: 'btn primary', onclick: pickFiles }, icon('upload'), 'Upload files')),
-      h('div', { class: 'dropzone', onclick: pickFiles },
+        h('button', { class: 'btn primary', onclick: () => pickFiles() }, icon('upload'), 'Upload files')),
+      h('div', { class: 'dropzone', onclick: () => pickFiles() },
         h('b', {}, 'Drag & drop files here'), ' or click to browse', h('br'),
         h('span', { class: 'small' }, 'PowerPoint (.pptx, .ppt, .ppsx), PDF, images (JPG, PNG, GIF, WebP, SVG) and videos (MP4, WebM)')),
+      studio ? localPanel() : null,
       h('div', { id: 'uploads', class: 'uploads' }),
       h('div', { class: 'toolbar' },
         h('div', { class: 'chips' }, filters.map(([id, label]) => h('button', { class: `chip ${state.mediaFilter === id ? 'on' : ''}`, onclick: () => { state.mediaFilter = id; renderPage(); } }, label))),
@@ -751,7 +872,8 @@
     };
     draw();
     return h('div', { class: 'card pl-library' },
-      h('div', { class: 'section-head' }, h('h3', {}, 'Library'), h('div', { class: 'spacer' }), h('button', { class: 'btn sm', onclick: pickFiles }, icon('upload'), 'Upload')),
+      h('div', { class: 'section-head' }, h('h3', {}, 'Library'), h('div', { class: 'spacer' }),
+        h('button', { class: 'btn sm', title: 'Upload files and add them to this playlist', onclick: () => pickFiles({ addTo: p }) }, icon('upload'), 'Upload')),
       h('div', { style: { padding: '10px 12px' } }, h('input', { type: 'search', placeholder: 'Search…', oninput: (e) => { q = e.target.value.toLowerCase(); draw(); } })),
       list);
   }
@@ -765,6 +887,13 @@
   const minToHHMM = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
   const TYPE_COLOR = { web: '#0d9488', image: '#2563eb', video: '#9333ea', presentation: '#b45309', text: '#db2777' };
   const ordinal = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`;
+
+  /** Schedule targets for a screen, a group filter ({ id: '__group', groups: [name] }) or nothing. */
+  function targetsFor(display) {
+    if (!display || display.id === '__none') return { displays: [], groups: [] };
+    if (display.id === '__group') return { displays: [], groups: [...display.groups] };
+    return { displays: [display.id], groups: [] };
+  }
 
   function weekStart(offset) {
     const d = KevSchedule.weekStart(new Date());
@@ -833,12 +962,16 @@
     const start = weekStart(state.calWeekOffset);
     const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
     const approved = state.displays.filter((d) => d.approved);
-    const filterDisplay = byId(state.displays, state.calDisplay);
+    // The filter can be one screen or a whole group ("g:<name>").
+    const filterGroup = (state.calDisplay || '').startsWith('g:') ? state.calDisplay.slice(2) : null;
+    const filterDisplay = filterGroup ? { id: '__group', name: filterGroup, groups: [filterGroup], defaultPlaylistId: null } : byId(state.displays, state.calDisplay);
     const relevant = state.schedules.filter((s) => !filterDisplay || KevSchedule.appliesToDisplay(s, filterDisplay));
     const view = state.calView || 'calendar';
 
     const displaySel = h('select', { style: { width: 'auto' }, onchange: (e) => { state.calDisplay = e.target.value; renderPage(); } },
-      h('option', { value: '' }, 'All displays'), approved.map((d) => h('option', { value: d.id, selected: d.id === state.calDisplay }, d.name)));
+      h('option', { value: '' }, 'All displays'),
+      state.groups.length ? h('optgroup', { label: 'Groups' }, state.groups.map((g) => h('option', { value: `g:${g.name}`, selected: `g:${g.name}` === state.calDisplay }, `▦ ${g.name}`))) : null,
+      approved.length ? h('optgroup', { label: 'Screens' }, approved.map((d) => h('option', { value: d.id, selected: d.id === state.calDisplay }, d.name))) : null);
     const viewSel = segmented([['calendar', 'Calendar'], ['week', 'Week overview']], view, (v) => { state.calView = v; renderPage(); });
 
     const used = [...new Set(relevant.map((s) => KevSchedule.contentKey(s)))].map((k) => ({ k, ...contentInfo(k) }));
@@ -849,7 +982,7 @@
         ? 'What every screen plays, day by day. Click a bar to change it.'
         : 'Click and drag on the calendar to schedule something. Click a block to edit it.',
         viewSel, displaySel,
-        h('button', { class: 'btn primary', onclick: () => scheduleDialog({ targets: { displays: filterDisplay ? [filterDisplay.id] : [], groups: [] } }) }, icon('plus'), 'Add to schedule')),
+        h('button', { class: 'btn primary', onclick: () => scheduleDialog({ targets: filterGroup ? { displays: [], groups: [filterGroup] } : { displays: filterDisplay ? [filterDisplay.id] : [], groups: [] } }) }, icon('plus'), 'Add to schedule')),
       h('div', { class: 'row', style: { marginBottom: '12px' } },
         h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset--; renderPage(); } }, icon('left')),
         h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset = 0; renderPage(); } }, 'This week'),
@@ -934,7 +1067,7 @@
           state.busy = false;
           sel.remove();
           const s = Math.min(a, b), en = Math.max(a, b);
-          scheduleDialog({ days: [d.getDay()], start: minToHHMM(s), end: en >= 1440 ? '00:00' : minToHHMM(en), targets: { displays: filterDisplay ? [filterDisplay.id] : [], groups: [] } });
+          scheduleDialog({ days: [d.getDay()], start: minToHHMM(s), end: en >= 1440 ? '00:00' : minToHHMM(en), targets: targetsFor(filterDisplay) });
         };
         document.addEventListener('mousemove', move);
         document.addEventListener('mouseup', up);
@@ -947,23 +1080,23 @@
   }
 
   /** One row per day showing exactly what a display plays (schedule + default + recurring items). */
-  function weekOverview(days, display, picked) {
+  function weekOverview(days, display, picked, label) {
     const today = dkey(new Date());
-    const target = display || { id: '__none', group: '', defaultPlaylistId: null };
+    const target = display || { id: '__none', groups: [], defaultPlaylistId: null };
     const ticks = [0, 3, 6, 9, 12, 15, 18, 21, 24];
     const pct = (m) => `${(m / 1440) * 100}%`;
     const rows = days.map((d) => {
       const segs = KevSchedule.dayTimeline(state.schedules, target, d, 5);
       const recurring = KevSchedule.intervalsOn(state.schedules, target, d);
-      const track = h('div', { class: 'wk-track', title: 'Click to schedule something on this day', onclick: () => scheduleDialog({ days: [d.getDay()], targets: { displays: display ? [display.id] : [], groups: [] } }) });
+      const track = h('div', { class: 'wk-track', title: 'Click to schedule something on this day', onclick: () => scheduleDialog({ days: [d.getDay()], targets: targetsFor(display) }) });
       segs.forEach((sg) => {
-        const c = contentInfo(sg.key);
+        const c = !sg.key && target.id === '__group' ? { name: 'Each screen’s own default', color: '#94a3b8', kind: 'default' } : contentInfo(sg.key);
         const s = sg.scheduleId ? byId(state.schedules, sg.scheduleId) : null;
         track.append(h('div', {
           class: `wk-seg ${sg.scheduleId ? '' : 'default'} ${sg.key ? '' : 'idle'}`,
           style: { left: pct(sg.from), width: pct(sg.to - sg.from), background: c.color },
           title: `${minToHHMM(sg.from)}–${sg.to >= 1440 ? '24:00' : minToHHMM(sg.to)}  ${c.name}${sg.scheduleId ? '' : sg.key ? ' (default playlist)' : ''}`,
-          onclick: (e) => { e.stopPropagation(); if (s) scheduleDialog(s); else if (display) displayDialog(display); },
+          onclick: (e) => { e.stopPropagation(); if (s) scheduleDialog(s); else if (display && !display.id.startsWith('__')) displayDialog(display); },
         }, sg.to - sg.from >= 90 ? h('span', {}, (sg.scheduleId ? '' : '◦ ') + (s?.name || c.name)) : null));
       });
       if (dkey(d) === today) {
@@ -981,28 +1114,67 @@
           })) : null));
     });
     return h('div', { class: 'card wk' },
-      h('div', { class: 'wk-head' }, h('div', { class: 'muted small' }, display ? (picked ? `Showing: ${display.name}` : display.name) : 'No displays yet'),
+      label ? h('div', { class: 'wk-caption muted small' }, label) : null,
+      h('div', { class: 'wk-head' }, h('div', { class: 'muted small' }, label ? '' : display ? (picked ? `Showing: ${display.name}` : display.name) : 'No displays yet'),
         h('div', { class: 'wk-ticks' }, ticks.map((t) => h('span', { style: { left: pct(t * 60) } }, `${pad(t)}:00`)))),
       rows,
       h('div', { class: 'wk-foot muted small' }, '◦ = default playlist of the screen · ↻ = shown repeatedly within its time window, on top of the content above'));
   }
 
-  function scheduleTable(list) {
-    if (!list.length) return h('div', { class: 'card empty', style: { marginTop: '16px' } }, h('h3', {}, 'Nothing scheduled yet'), h('p', {}, 'Drag on the calendar above, or set a default playlist for each display.'));
-    return h('div', { class: 'card', style: { marginTop: '16px', overflowX: 'auto' } },
-      h('table', { class: 'tbl' },
-        h('thead', {}, h('tr', {}, ['', 'Content', 'When', 'Screens', 'Priority', 'On'].map((x) => h('th', {}, x)))),
-        h('tbody', {}, list.map((s) => {
-          const c = contentInfo(s);
-          return h('tr', { class: 'click', onclick: () => scheduleDialog(s) },
-            h('td', { style: { width: '20px' } }, h('span', { class: 'swatch', style: { background: c.color } })),
-            h('td', {}, h('b', {}, s.name || c.name), h('div', { class: 'muted small' }, s.name ? `${c.name} · ${c.kind}` : c.kind,
-              s.itemDuration ? ` · ${s.itemDuration} s per item` : '')),
-            h('td', {}, describeWhen(s), describePeriod(s) ? h('div', { class: 'muted small' }, describePeriod(s)) : null),
-            h('td', {}, describeTargets(s)),
-            h('td', {}, s.priority >= 10 ? h('span', { class: 'badge err' }, 'Urgent') : s.priority >= 5 ? h('span', { class: 'badge warn' }, 'High') : h('span', { class: 'muted' }, 'Normal')),
-            h('td', { onclick: (e) => e.stopPropagation() }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: async (e) => { await api(`/schedules/${s.id}`, { method: 'PUT', body: { ...s, enabled: e.target.checked } }); } })));
-        }))));
+  const selectedEntries = new Set();
+
+  /** Table of schedule entries with checkboxes: change many entries at once. */
+  function scheduleTable(list, opts = {}) {
+    if (!list.length) return h('div', { class: 'card empty', style: { marginTop: '16px' } }, h('h3', {}, 'Nothing scheduled yet'),
+      h('p', {}, opts.emptyText || 'Drag on the calendar above, or set a default playlist for each display.'));
+    for (const id of [...selectedEntries]) if (!state.schedules.some((x) => x.id === id)) selectedEntries.delete(id);
+    const ids = list.map((x) => x.id).filter((id) => selectedEntries.has(id));
+    const bulk = async (body, msg) => {
+      try {
+        await api('/schedules/bulk', { method: 'POST', body: { ids, ...body } });
+        selectedEntries.clear(); await loadAll(); renderPage({ soft: true }); toast(msg, 'ok');
+      } catch (e) { toast(e.message, 'err'); }
+    };
+    const bar = ids.length ? h('div', { class: 'bulk-bar card' },
+      h('b', {}, `${ids.length} selected`),
+      h('button', { class: 'btn sm', onclick: () => bulk({ action: 'enable' }, 'Enabled') }, 'Enable'),
+      h('button', { class: 'btn sm', onclick: () => bulk({ action: 'disable' }, 'Disabled') }, 'Disable'),
+      h('button', { class: 'btn sm', onclick: () => {
+        const t = { displays: [], groups: [] };
+        modal({
+          title: `Change screens of ${ids.length} entr${ids.length === 1 ? 'y' : 'ies'}`,
+          body: [h('p', { class: 'muted', style: { margin: 0 } }, 'The selected entries will play on these screens and groups (replacing their current ones).'), targetChips(t)],
+          footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, 'Cancel'),
+            h('button', { class: 'btn primary', onclick: async () => { close(); await bulk({ action: 'setTargets', targets: t }, 'Screens updated'); } }, 'Apply')],
+        });
+      } }, 'Change screens…'),
+      h('select', { style: { width: 'auto' }, onchange: (e) => { if (e.target.value !== '') bulk({ action: 'priority', priority: Number(e.target.value) }, 'Priority updated'); } },
+        h('option', { value: '' }, 'Priority…'), [[0, 'Normal'], [5, 'High'], [10, 'Urgent']].map(([v, l]) => h('option', { value: v }, l))),
+      h('button', { class: 'btn sm danger', onclick: async () => {
+        if (!(await confirmBox('Remove from schedule?', `${ids.length} entr${ids.length === 1 ? 'y is' : 'ies are'} removed. The content itself is not deleted.`, 'Remove'))) return;
+        bulk({ action: 'delete' }, 'Removed');
+      } }, icon('trash'), 'Remove'),
+      h('div', { class: 'spacer' }),
+      h('button', { class: 'btn sm ghost', onclick: () => { selectedEntries.clear(); renderPage({ soft: true }); } }, 'Clear')) : null;
+    const allOn = list.every((x) => selectedEntries.has(x.id));
+    return h('div', { style: { marginTop: '16px' } }, bar,
+      h('div', { class: 'card', style: { overflowX: 'auto' } },
+        h('table', { class: 'tbl' },
+          h('thead', {}, h('tr', {},
+            h('th', { style: { width: '28px' } }, h('input', { type: 'checkbox', checked: allOn, title: 'Select all', onchange: (e) => { list.forEach((x) => (e.target.checked ? selectedEntries.add(x.id) : selectedEntries.delete(x.id))); renderPage({ soft: true }); } })),
+            ['', 'Content', 'When', 'Screens', 'Priority', 'On'].map((x) => h('th', {}, x)))),
+          h('tbody', {}, list.map((s) => {
+            const c = contentInfo(s);
+            return h('tr', { class: `click ${selectedEntries.has(s.id) ? 'picked' : ''}`, onclick: () => scheduleDialog(s) },
+              h('td', { onclick: (e) => e.stopPropagation() }, h('input', { type: 'checkbox', checked: selectedEntries.has(s.id), onchange: (e) => { e.target.checked ? selectedEntries.add(s.id) : selectedEntries.delete(s.id); renderPage({ soft: true }); } })),
+              h('td', { style: { width: '20px' } }, h('span', { class: 'swatch', style: { background: c.color } })),
+              h('td', {}, h('b', {}, s.name || c.name), h('div', { class: 'muted small' }, s.name ? `${c.name} · ${c.kind}` : c.kind,
+                s.itemDuration ? ` · ${s.itemDuration} s per item` : '')),
+              h('td', {}, describeWhen(s), describePeriod(s) ? h('div', { class: 'muted small' }, describePeriod(s)) : null),
+              h('td', {}, describeTargets(s)),
+              h('td', {}, s.priority >= 10 ? h('span', { class: 'badge err' }, 'Urgent') : s.priority >= 5 ? h('span', { class: 'badge warn' }, 'High') : h('span', { class: 'muted' }, 'Normal')),
+              h('td', { onclick: (e) => e.stopPropagation() }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: async (e) => { await api(`/schedules/${s.id}`, { method: 'PUT', body: { ...s, enabled: e.target.checked } }); } })));
+          })))));
   }
 
   function scheduleDialog(initial = {}) {
@@ -1185,28 +1357,228 @@
     return (state.overview?.playerUrls || [])[0] || `${location.origin}/player/`;
   }
 
+  // ---------------------------------------------------------------------------
+  // Groups
+  // ---------------------------------------------------------------------------
+  const groupNames = () => state.groups.map((g) => g.name);
+  const groupByName = (n) => state.groups.find((g) => g.name === n);
+  const groupsOfDisplay = (d) => KevSchedule.groupsOf(d);
+  const groupBadge = (n) => {
+    const g = groupByName(n);
+    return h('span', { class: 'badge', style: g ? { background: `${g.color}22`, color: g.color } : {} }, `▦ ${n}`);
+  };
+
+  /**
+   * Toggle chips for choosing groups, with "+ New group" inline.
+   * `selected` is an array of names that is updated in place.
+   */
+  function groupPicker(selected, onChange) {
+    const box = h('div', { class: 'chips' });
+    const draw = () => {
+      const input = h('input', { placeholder: 'New group name', style: { width: '170px', padding: '5px 10px', borderRadius: '999px' },
+        onkeydown: (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } } });
+      const add = () => {
+        const n = input.value.trim();
+        if (!n) return;
+        if (!selected.some((x) => x.toLowerCase() === n.toLowerCase())) selected.push(n);
+        if (!groupByName(n)) state.groups.push({ id: `new-${n}`, name: n, color: '#64748b', members: 0, online: 0, schedules: 0, displayIds: [] });
+        draw(); onChange && onChange();
+      };
+      box.replaceChildren(
+        ...groupNames().map((n) => h('button', { type: 'button', class: `chip ${selected.includes(n) ? 'on' : ''}`, onclick: () => {
+          const i = selected.indexOf(n);
+          if (i >= 0) selected.splice(i, 1); else selected.push(n);
+          draw(); onChange && onChange();
+        } }, `▦ ${n}`)),
+        h('span', { class: 'row', style: { gap: '4px' } }, input, h('button', { type: 'button', class: 'btn sm', onclick: add }, icon('plus'), 'Add')));
+    };
+    draw();
+    return box;
+  }
+
+  function GroupsPage(arg) {
+    const g = state.groups.find((x) => x.id === arg);
+    if (g) return groupDetail(g);
+    return [
+      pageHead('Groups', 'Put screens in groups, then schedule or send content to the whole group at once. A screen can be in several groups.',
+        h('button', { class: 'btn primary', onclick: () => groupDialog() }, icon('plus'), 'New group')),
+      state.groups.length ? h('div', { class: 'grp-grid' }, state.groups.map((x) => {
+        const members = state.displays.filter((d) => d.approved && groupsOfDisplay(d).includes(x.name));
+        return h('a', { class: 'card grp-card', href: `#/groups/${x.id}`, style: { borderTopColor: x.color } },
+          h('div', { class: 'row' }, h('h3', {}, x.name), h('div', { class: 'spacer' }),
+            h('span', { class: 'small muted' }, `${members.filter((d) => d.online).length}/${members.length} online`)),
+          x.description ? h('div', { class: 'muted small' }, x.description) : null,
+          h('div', { class: 'chips' }, members.length ? members.slice(0, 8).map((d) => h('span', { class: 'chip', style: { cursor: 'inherit' } },
+            h('span', { class: `dot ${d.online ? 'on' : ''}`, style: { marginRight: '6px' } }), d.name)) : h('span', { class: 'muted small' }, 'No screens yet'),
+            members.length > 8 ? h('span', { class: 'muted small' }, `+${members.length - 8} more`) : null),
+          h('div', { class: 'muted small' }, `${x.schedules} schedule entr${x.schedules === 1 ? 'y' : 'ies'}`));
+      })) : h('div', { class: 'card empty' }, h('h3', {}, 'No groups yet'),
+        h('p', {}, 'Create groups like “Lobby”, “Canteen” or “Floor 2”, add screens, and schedule content for all of them at once.'),
+        h('button', { class: 'btn primary', onclick: () => groupDialog() }, icon('plus'), 'Create your first group')),
+    ];
+  }
+
+  /** Create or edit a group (name, colour, description, members). */
+  function groupDialog(existing) {
+    const approved = state.displays.filter((d) => d.approved);
+    const g = Object.assign({ name: '', color: '#0891b2', description: '' }, existing || {});
+    const members = new Set(existing ? approved.filter((d) => groupsOfDisplay(d).includes(existing.name)).map((d) => d.id) : []);
+    const err = h('div', { class: 'err-text' });
+    const name = h('input', { value: g.name, placeholder: 'e.g. Canteen' });
+    const color = h('input', { type: 'color', value: g.color });
+    const desc = h('input', { value: g.description || '', placeholder: 'Optional, e.g. “All screens on the ground floor”' });
+    modal({
+      title: existing ? `Edit group — ${existing.name}` : 'New group',
+      body: [
+        h('div', { class: 'row', style: { gap: '12px', alignItems: 'flex-end' } }, h('label', { class: 'field', style: { flex: 1 } }, 'Name', name), h('label', { class: 'field' }, 'Colour', color)),
+        h('label', { class: 'field' }, 'Description', desc),
+        h('div', { class: 'field' }, h('b', { class: 'small' }, 'Screens in this group'),
+          approved.length ? screenChecklist(approved, members) : h('span', { class: 'hint' }, 'No screens connected yet. You can add them later.')),
+        err,
+      ],
+      footer: (close) => [
+        existing ? h('button', { class: 'btn danger', onclick: async () => {
+          const n = state.schedules.filter((s) => (s.targets?.groups || []).includes(existing.name)).length;
+          if (!(await confirmBox('Delete group?', `The screens stay connected; they just leave “${existing.name}”.${n ? ` ${n} schedule entr${n === 1 ? 'y' : 'ies'} aimed only at this group will be removed too.` : ''}`, 'Delete group'))) return;
+          await api(`/groups/${existing.id}`, { method: 'DELETE' });
+          close(); await loadAll(); go('#/groups'); renderPage(); toast('Group deleted');
+        } }, icon('trash'), 'Delete') : null,
+        h('div', { class: 'spacer' }),
+        h('button', { class: 'btn', onclick: close }, 'Cancel'),
+        h('button', { class: 'btn primary', onclick: async () => {
+          try {
+            let saved;
+            if (existing) {
+              saved = await api(`/groups/${existing.id}`, { method: 'PATCH', body: { name: name.value, color: color.value, description: desc.value } });
+              const before = new Set(existing.displayIds || []);
+              await api(`/groups/${existing.id}/members`, { method: 'POST', body: { add: [...members].filter((id) => !before.has(id)), remove: [...before].filter((id) => !members.has(id)) } });
+            } else {
+              saved = await api('/groups', { method: 'POST', body: { name: name.value, color: color.value, description: desc.value, displayIds: [...members] } });
+            }
+            close(); await loadAll();
+            if (route().page === 'groups') go(`#/groups/${saved.id}`);
+            renderPage(); toast('Group saved', 'ok');
+          } catch (e) { err.textContent = e.message; }
+        } }, existing ? 'Save' : 'Create group'),
+      ],
+    });
+  }
+
+  /** Checkbox list of screens (with "select all"), updating a Set of ids. */
+  function screenChecklist(list, selected) {
+    const box = h('div', { class: 'screen-check' });
+    const draw = () => box.replaceChildren(
+      h('label', { class: 'check small', style: { gridColumn: '1 / -1' } },
+        h('input', { type: 'checkbox', checked: list.every((d) => selected.has(d.id)), onchange: (e) => { list.forEach((d) => (e.target.checked ? selected.add(d.id) : selected.delete(d.id))); draw(); } }),
+        h('b', {}, 'Select all')),
+      ...list.map((d) => h('label', { class: 'check' },
+        h('input', { type: 'checkbox', checked: selected.has(d.id), onchange: (e) => { e.target.checked ? selected.add(d.id) : selected.delete(d.id); draw(); } }),
+        h('span', { class: `dot ${d.online ? 'on' : ''}` }), d.name,
+        groupsOfDisplay(d).length ? h('span', { class: 'muted small' }, ` · ${groupsOfDisplay(d).join(', ')}`) : null)));
+    draw();
+    return box;
+  }
+
+  function groupDetail(g) {
+    const members = state.displays.filter((d) => d.approved && groupsOfDisplay(d).includes(g.name));
+    const entries = state.schedules.filter((s) => (s.targets?.groups || []).includes(g.name));
+    const sel = { group: g.name };
+    const start = weekStart(state.calWeekOffset);
+    const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
+    const others = state.groups.filter((x) => x.id !== g.id);
+    return [
+      pageHead(h('span', { class: 'row', style: { gap: '10px' } }, h('span', { class: 'swatch', style: { background: g.color, width: '16px', height: '16px' } }), g.name),
+        `${members.length} screen${members.length === 1 ? '' : 's'} · ${members.filter((d) => d.online).length} online${g.description ? ` · ${g.description}` : ''}`,
+        h('a', { class: 'btn ghost', href: '#/groups' }, icon('left'), 'All groups'),
+        h('button', { class: 'btn', onclick: () => groupDialog(g) }, icon('settings'), 'Edit group'),
+        h('button', { class: 'btn primary', onclick: () => scheduleDialog({ targets: { displays: [], groups: [g.name] } }) }, icon('schedule'), 'Schedule for this group')),
+      h('div', { class: 'row wrap', style: { marginBottom: '16px' } },
+        h('button', { class: 'btn sm', onclick: () => sendDialog({ targets: { displays: [], groups: [g.name] } }) }, icon('play'), 'Send to group'),
+        h('button', { class: 'btn sm', onclick: () => bulkDefaultDialog({ group: g.name }, `the ${members.length} screens in “${g.name}”`) }, 'Set default playlist'),
+        h('button', { class: 'btn sm', onclick: () => groupCommand(sel, 'identify', 'Identify') }, icon('eye'), 'Identify'),
+        h('button', { class: 'btn sm', onclick: () => groupCommand(sel, 'reload', 'Reload') }, icon('refresh'), 'Reload'),
+        others.length && entries.length ? h('button', { class: 'btn sm', onclick: () => copyScheduleDialog(g, entries.length) }, icon('copy'), 'Copy schedule to…') : null),
+      h('div', { class: 'grp-detail' },
+        h('div', { class: 'card' },
+          h('div', { class: 'section-head' }, h('h3', {}, 'Screens'), h('div', { class: 'spacer' }), h('button', { class: 'btn sm', onclick: () => groupDialog(g) }, icon('plus'), 'Add or remove')),
+          members.length ? members.map((d) => h('div', { class: 'list-row' },
+            h('span', { class: `dot ${d.online ? 'on' : ''}` }),
+            h('div', { style: { minWidth: 0 } }, h('b', {}, d.name), h('div', { class: 'muted small' }, d.online ? (d.nowPlaying ? `Showing: ${d.nowPlaying.name}` : 'Online') : `Offline · ${ago(d.lastSeen)}`)),
+            h('div', { class: 'spacer' }),
+            h('button', { class: 'btn icon ghost', title: `Remove from ${g.name}`, onclick: async () => {
+              await api(`/groups/${g.id}/members`, { method: 'POST', body: { remove: [d.id] } }); await loadAll(); renderPage();
+            } }, '✕'))) :
+            h('div', { class: 'empty small' }, 'No screens yet. ', h('a', { href: '#', onclick: (e) => { e.preventDefault(); groupDialog(g); } }, 'Add screens'))),
+        h('div', { class: 'stack' },
+          h('div', { class: 'row' }, h('h3', {}, 'What this group plays this week'), h('div', { class: 'spacer' }),
+            h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset--; renderPage(); } }, icon('left')),
+            h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset = 0; renderPage(); } }, 'This week'),
+            h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset++; renderPage(); } }, icon('right'))),
+          weekOverview(days, { id: '__group', name: g.name, groups: [g.name], defaultPlaylistId: null }, false, `Everything scheduled for “${g.name}”. When nothing is scheduled, each screen shows its own default playlist; schedules aimed at a single screen are not shown here.`))),
+      h('h3', { style: { margin: '18px 0 0' } }, 'Schedule entries for this group'),
+      scheduleTable(entries, { emptyText: 'Nothing is scheduled for this group yet. Click “Schedule for this group”.' }),
+    ];
+  }
+
+  function copyScheduleDialog(g, count) {
+    const picked = new Set();
+    const others = state.groups.filter((x) => x.id !== g.id);
+    modal({
+      title: `Copy the schedule of “${g.name}”`,
+      body: [h('p', { class: 'muted', style: { margin: 0 } }, `The ${count} schedule entr${count === 1 ? 'y' : 'ies'} of this group are copied to the groups you pick. The copies can then be changed separately.`),
+        h('div', { class: 'screen-check' }, others.map((x) => h('label', { class: 'check' },
+          h('input', { type: 'checkbox', onchange: (e) => (e.target.checked ? picked.add(x.id) : picked.delete(x.id)) }),
+          h('span', { class: 'swatch', style: { background: x.color } }), x.name)))],
+      footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, 'Cancel'),
+        h('button', { class: 'btn primary', onclick: async () => {
+          try {
+            const r = await api(`/groups/${g.id}/copy-schedule`, { method: 'POST', body: { toGroupIds: [...picked] } });
+            close(); await loadAll(); renderPage(); toast(`Copied ${r.copied} schedule entr${r.copied === 1 ? 'y' : 'ies'}`, 'ok');
+          } catch (e) { toast(e.message, 'err'); }
+        } }, icon('copy'), 'Copy')],
+    });
+  }
+
+  /** Set the default playlist for many screens at once. */
+  function bulkDefaultDialog(selection, label) {
+    let pid = state.playlists[0]?.id || null;
+    modal({
+      title: 'Set default playlist',
+      body: [h('p', { class: 'muted', style: { margin: 0 } }, `For ${label}. It plays whenever nothing else is scheduled.`),
+        h('label', { class: 'field' }, 'Playlist', playlistSelect(pid, (v) => (pid = v)))],
+      footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, 'Cancel'),
+        h('button', { class: 'btn primary', onclick: async () => {
+          const r = await api('/displays/bulk', { method: 'PATCH', body: { ...selection, patch: { defaultPlaylistId: pid } } });
+          close(); await loadAll(); renderPage(); toast(`Updated ${r.updated} screen${r.updated === 1 ? '' : 's'}`, 'ok');
+        } }, 'Save')],
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Displays
+  // ---------------------------------------------------------------------------
   function pairDialog() {
     const code = h('input', { class: 'code-input', maxlength: 6, placeholder: 'ABC123', autocomplete: 'off' });
     const name = h('input', { placeholder: 'e.g. Reception TV' });
-    const group = h('input', { placeholder: 'e.g. Ground floor (optional)', list: 'groups-list' });
+    const groups = [];
     let defPl = state.playlists[0]?.id || null;
     const err = h('div', { class: 'err-text' });
-    const groups = [...new Set(state.displays.map((d) => d.group).filter(Boolean))];
     modal({
       title: 'Add a display',
       body: [
         h('ol', { style: { margin: 0, paddingLeft: '20px', lineHeight: 1.8 } },
-          h('li', {}, 'On the screen (smart TV, mini-PC, Raspberry Pi…) open a browser at:', h('div', { class: 'urlbox', style: { margin: '6px 0' } }, playerUrl())),
+          h('li', {}, 'Start the KevCast Player app on the screen, or open this page in its browser:', h('div', { class: 'urlbox', style: { margin: '6px 0' } }, playerUrl())),
           h('li', {}, 'A 6-character code appears on the screen. Type it below.')),
         h('label', { class: 'field' }, 'Code shown on the screen', code),
-        h('div', { class: 'grid2' }, h('label', { class: 'field' }, 'Name', name), h('label', { class: 'field' }, 'Group', group, h('datalist', { id: 'groups-list' }, groups.map((g) => h('option', { value: g }))))),
+        h('label', { class: 'field' }, 'Name', name),
+        h('div', { class: 'field' }, h('b', { class: 'small' }, 'Groups'), h('span', { class: 'hint' }, 'Optional. Content scheduled for a group plays on all its screens.'), groupPicker(groups)),
         h('label', { class: 'field' }, 'Show by default', h('span', { class: 'hint' }, 'Plays whenever nothing else is scheduled'), playlistSelect(defPl, (v) => (defPl = v))),
         err,
       ],
       footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, 'Cancel'),
         h('button', { class: 'btn primary', onclick: async () => {
           try {
-            await api('/displays/pair', { method: 'POST', body: { code: code.value, name: name.value.trim(), group: group.value.trim(), defaultPlaylistId: defPl } });
+            await api('/displays/pair', { method: 'POST', body: { code: code.value, name: name.value.trim(), groups, defaultPlaylistId: defPl } });
             close(); toast('Display connected!', 'ok'); await loadAll(); renderPage();
           } catch (e) { err.textContent = e.message; }
         } }, 'Connect display')],
@@ -1214,7 +1586,6 @@
   }
 
   const isApp = (d) => /KevCastPlayer/.test(d.userAgent || '');
-  const groupNames = () => [...new Set(state.displays.filter((d) => d.approved).map((d) => d.group).filter(Boolean))].sort();
 
   async function groupCommand(sel, action, label) {
     const r = await api('/displays/command', { method: 'POST', body: { ...sel, action } });
@@ -1222,31 +1593,68 @@
     toast(r.delivered ? `${label} sent to ${r.delivered} of ${r.targeted} screen${r.targeted > 1 ? 's' : ''}` : 'All screens in this selection are offline', r.delivered ? '' : 'err');
   }
 
+  const selectedDisplays = new Set();
+
   function DisplaysPage() {
     const approved = state.displays.filter((d) => d.approved);
     const pending = state.displays.filter((d) => !d.approved && Date.now() - new Date(d.lastSeen) < 120000);
-    const groups = groupNames();
-    const sections = [...groups.map((g) => [g, approved.filter((d) => d.group === g)]), ['', approved.filter((d) => !d.group)]].filter(([, list]) => list.length);
-    const section = ([g, list]) => {
-      const sel = g ? { group: g } : { ids: list.map((d) => d.id) };
-      const online = list.filter((d) => d.online).length;
-      return h('div', { style: { marginBottom: '22px' } },
-        h('div', { class: 'row wrap', style: { marginBottom: '10px' } },
-          h('h2', {}, g ? `▦ ${g}` : groups.length ? 'Not in a group' : 'All screens'),
-          h('span', { class: 'muted small' }, `${list.length} screen${list.length > 1 ? 's' : ''} · ${online} online`),
-          h('div', { class: 'spacer' }),
-          h('button', { class: 'btn sm primary', onclick: () => sendDialog({ targets: g ? { displays: [], groups: [g] } : { displays: sel.ids, groups: [] } }) }, icon('play'), g ? 'Send to group' : 'Send to these'),
-          h('button', { class: 'btn sm', onclick: () => groupCommand(sel, 'identify', 'Identify') }, icon('eye'), 'Identify'),
-          h('button', { class: 'btn sm', onclick: () => groupCommand(sel, 'reload', 'Reload') }, icon('refresh'), 'Reload'),
-          g ? h('button', { class: 'btn sm ghost', onclick: () => renameGroupDialog(g) }, 'Rename') : null),
-        h('div', { class: 'disp-grid' }, list.map(displayCard)));
-    };
+    const filter = state.displayFilter || '';
+    const shown = approved.filter((d) => !filter || (filter === '__none' ? !groupsOfDisplay(d).length : groupsOfDisplay(d).includes(filter)));
+    for (const id of [...selectedDisplays]) if (!approved.some((d) => d.id === id)) selectedDisplays.delete(id);
+    const ids = [...selectedDisplays];
+    const n = ids.length;
+
+    let bulk = null;
+    if (n) {
+      const addSel = h('select', { style: { width: 'auto' } }, h('option', { value: '' }, 'Add to group…'), groupNames().map((g) => h('option', { value: g }, g)), h('option', { value: '__new' }, '+ New group…'));
+      addSel.onchange = async () => {
+        let g = addSel.value;
+        addSel.value = '';
+        if (!g) return;
+        if (g === '__new') { g = (prompt('Name of the new group') || '').trim(); if (!g) return; }
+        await api('/displays/bulk', { method: 'PATCH', body: { ids, addGroups: [g] } });
+        await loadAll(); renderPage(); toast(`Added ${n} screen${n === 1 ? '' : 's'} to “${g}”`, 'ok');
+      };
+      const inSel = [...new Set(approved.filter((d) => selectedDisplays.has(d.id)).flatMap(groupsOfDisplay))];
+      const remSel = h('select', { style: { width: 'auto' } }, h('option', { value: '' }, 'Remove from group…'), inSel.map((g) => h('option', { value: g }, g)));
+      remSel.onchange = async () => {
+        const g = remSel.value;
+        remSel.value = '';
+        if (!g) return;
+        await api('/displays/bulk', { method: 'PATCH', body: { ids, removeGroups: [g] } });
+        await loadAll(); renderPage(); toast(`Removed from “${g}”`, 'ok');
+      };
+      bulk = h('div', { class: 'card bulk-bar' },
+        h('b', {}, `${n} screen${n === 1 ? '' : 's'} selected`),
+        addSel, inSel.length ? remSel : null,
+        h('button', { class: 'btn sm', onclick: () => bulkDefaultDialog({ ids }, `${n} selected screen${n === 1 ? '' : 's'}`) }, 'Set default playlist'),
+        h('button', { class: 'btn sm', onclick: () => sendDialog({ targets: { displays: ids, groups: [] } }) }, icon('play'), 'Send to these'),
+        h('button', { class: 'btn sm', onclick: () => scheduleDialog({ targets: { displays: ids, groups: [] } }) }, icon('schedule'), 'Schedule'),
+        h('button', { class: 'btn sm', onclick: () => groupCommand({ ids }, 'identify', 'Identify') }, icon('eye')),
+        h('div', { class: 'spacer' }),
+        h('button', { class: 'btn sm ghost', onclick: () => { selectedDisplays.clear(); renderPage(); } }, 'Clear selection'));
+    }
+
     return [
-      pageHead('Displays', 'Screens running the KevCast Player app or a web browser. Put screens in groups to send content to many at once.',
+      pageHead('Displays', 'Tick screens to add them to a group or change many at once. Manage groups on the Groups page.',
         approved.length ? h('button', { class: 'btn', onclick: () => sendDialog({}) }, icon('play'), 'Send to screens') : null,
         h('button', { class: 'btn primary', onclick: pairDialog }, icon('plus'), 'Add display')),
       pending.length ? h('div', { class: 'alert' }, h('b', {}, `${pending.length} screen${pending.length > 1 ? 's are' : ' is'} waiting to be connected. `), 'Click “Add display” and enter the code shown on the screen.') : null,
-      approved.length ? [sections.map(section), connectHelp()] :
+      approved.length ? [
+        h('div', { class: 'toolbar' },
+          h('div', { class: 'chips' },
+            h('button', { class: `chip ${!filter ? 'on' : ''}`, onclick: () => { state.displayFilter = ''; renderPage(); } }, `All (${approved.length})`),
+            state.groups.map((g) => {
+              const c = approved.filter((d) => groupsOfDisplay(d).includes(g.name)).length;
+              return h('button', { class: `chip ${filter === g.name ? 'on' : ''}`, onclick: () => { state.displayFilter = g.name; renderPage(); } }, `▦ ${g.name} (${c})`);
+            }),
+            approved.some((d) => !groupsOfDisplay(d).length) ? h('button', { class: `chip ${filter === '__none' ? 'on' : ''}`, onclick: () => { state.displayFilter = '__none'; renderPage(); } }, 'No group') : null),
+          h('div', { class: 'spacer' }),
+          h('label', { class: 'check small' }, h('input', { type: 'checkbox', checked: shown.length && shown.every((d) => selectedDisplays.has(d.id)),
+            onchange: (e) => { shown.forEach((d) => (e.target.checked ? selectedDisplays.add(d.id) : selectedDisplays.delete(d.id))); renderPage({ soft: true }); } }), 'Select all')),
+        bulk,
+        h('div', { class: 'disp-grid' }, shown.map(displayCard)),
+        connectHelp()] :
         h('div', { class: 'card empty' }, h('h3', {}, 'No displays yet'),
           h('p', {}, 'Install the KevCast Player app on the screen (it finds this server automatically), or open this address in its browser:'), h('div', { class: 'urlbox', style: { maxWidth: '420px', margin: '10px auto' } }, playerUrl()),
           h('button', { class: 'btn primary', onclick: pairDialog }, 'I see a code — add display')),
@@ -1270,34 +1678,16 @@
       h('span', { class: 'muted small' }, 'The screen then shows a 6-character code. Click “Add display” above and enter it.'));
   }
 
-  function renameGroupDialog(g) {
-    const name = h('input', { value: g });
-    modal({
-      title: 'Rename group',
-      body: [h('label', { class: 'field' }, 'Group name', name)],
-      footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, 'Cancel'),
-        h('button', { class: 'btn primary', onclick: async () => {
-          const nn = name.value.trim();
-          await api('/displays/bulk', { method: 'PATCH', body: { group: g, patch: { group: nn } } });
-          for (const s of state.schedules.filter((x) => (x.targets?.groups || []).includes(g))) {
-            await api(`/schedules/${s.id}`, { method: 'PUT', body: { ...s, targets: { ...s.targets, groups: s.targets.groups.map((x) => (x === g ? nn : x)).filter(Boolean) } } });
-          }
-          close(); await loadAll(); renderPage(); toast('Group renamed', 'ok');
-        } }, 'Save')],
-    });
-  }
-
   function targetChips(targets, onChange) {
     const approved = state.displays.filter((d) => d.approved);
-    const groups = groupNames();
     const box = h('div', { class: 'chips' });
     const draw = () => {
       const all = !targets.displays.length && !targets.groups.length;
       box.replaceChildren(
         h('button', { type: 'button', class: `chip ${all ? 'on' : ''}`, onclick: () => { targets.displays = []; targets.groups = []; draw(); onChange && onChange(); } }, 'All displays'),
-        ...groups.map((g) => h('button', { type: 'button', class: `chip ${targets.groups.includes(g) ? 'on' : ''}`, onclick: () => {
-          targets.groups = targets.groups.includes(g) ? targets.groups.filter((x) => x !== g) : [...targets.groups, g]; draw(); onChange && onChange();
-        } }, `▦ ${g}`)),
+        ...state.groups.map((g) => h('button', { type: 'button', class: `chip ${targets.groups.includes(g.name) ? 'on' : ''}`, title: `${g.members} screen${g.members === 1 ? '' : 's'}`, onclick: () => {
+          targets.groups = targets.groups.includes(g.name) ? targets.groups.filter((x) => x !== g.name) : [...targets.groups, g.name]; draw(); onChange && onChange();
+        } }, `▦ ${g.name}`)),
         ...approved.map((d) => h('button', { type: 'button', class: `chip ${targets.displays.includes(d.id) ? 'on' : ''}`, onclick: () => {
           targets.displays = targets.displays.includes(d.id) ? targets.displays.filter((x) => x !== d.id) : [...targets.displays, d.id]; draw(); onChange && onChange();
         } }, d.name)));
@@ -1316,7 +1706,7 @@
     const resolveIds = () => {
       const approved = state.displays.filter((d) => d.approved);
       if (!t.displays.length && !t.groups.length) return approved.map((d) => d.id);
-      return approved.filter((d) => t.displays.includes(d.id) || (d.group && t.groups.includes(d.group))).map((d) => d.id);
+      return approved.filter((d) => t.displays.includes(d.id) || KevSchedule.groupsOf(d).some((g) => t.groups.includes(g))).map((d) => d.id);
     };
     const updateCount = () => { const n = resolveIds().length; count.textContent = `${n} screen${n === 1 ? '' : 's'} selected`; };
     updateCount();
@@ -1370,10 +1760,17 @@
     const shot = d.screenshotAt && d.online ? `/api/displays/${d.id}/screenshot?t=${encodeURIComponent(d.screenshotAt)}` : null;
     const preview = shot ? h('img', { src: shot, title: `Screenshot ${ago(d.screenshotAt)}` }) :
       d.online && npMedia?.thumb ? h('img', { src: npMedia.type === 'presentation' && np.slide ? npMedia.slideUrls[np.slide - 1] : npMedia.thumb }) : icon('display');
-    return h('div', { class: 'card disp-card' },
-      h('div', { class: 'row' }, h('span', { class: `dot ${d.online ? 'on' : ''}` }), h('h3', {}, d.name),
+    const picked = selectedDisplays.has(d.id);
+    return h('div', { class: `card disp-card ${picked ? 'picked' : ''}` },
+      h('div', { class: 'row' },
+        h('input', { type: 'checkbox', checked: picked, title: 'Select (to add to a group or change many at once)', onchange: (e) => { e.target.checked ? selectedDisplays.add(d.id) : selectedDisplays.delete(d.id); renderPage({ soft: true }); } }),
+        h('span', { class: `dot ${d.online ? 'on' : ''}` }), h('h3', {}, d.name),
         h('span', { class: 'badge', title: isApp(d) ? 'KevCast Player app' : 'Web browser' }, isApp(d) ? 'App' : 'Browser'), h('div', { class: 'spacer' }),
         h('span', { class: 'small muted' }, d.online ? 'Online' : `Offline · ${ago(d.lastSeen)}`)),
+      KevSchedule.groupsOf(d).length ? h('div', { class: 'chips' }, KevSchedule.groupsOf(d).map((g) => {
+        const gr = groupByName(g);
+        return gr ? h('a', { href: `#/groups/${gr.id}`, style: { textDecoration: 'none' } }, groupBadge(g)) : groupBadge(g);
+      })) : null,
       h('div', { class: 'disp-screen', style: d.orientation && d.orientation !== 'landscape' ? { aspectRatio: '9/16', maxHeight: '220px', margin: '0 auto' } : {} },
         preview,
         h('div', { class: 'np' }, d.online ? (np ? `▶ ${np.name}${np.slides ? ` · slide ${np.slide}/${np.slides}` : ''}` : 'Idle') : 'Not connected', shot ? h('span', { style: { float: 'right', opacity: 0.8 } }, `📷 ${ago(d.screenshotAt)}`) : null)),
@@ -1396,7 +1793,7 @@
   function displayDialog(d) {
     const s = JSON.parse(JSON.stringify(d));
     s.ticker = Object.assign({ enabled: false, text: '', speed: 60, bg: '#111827', fg: '#ffffff' }, s.ticker || {});
-    const groups = [...new Set(state.displays.map((x) => x.group).filter(Boolean))];
+    s.groups = [...KevSchedule.groupsOf(s)];
     const tickerBox = h('div', { class: 'stack' },
       h('label', { class: 'field' }, 'Ticker text', h('span', { class: 'hint' }, 'Each line becomes a separate message'), h('textarea', { rows: 3, oninput: (e) => (s.ticker.text = e.target.value) }, s.ticker.text)),
       h('div', { class: 'row wrap', style: { gap: '16px' } },
@@ -1422,9 +1819,8 @@
     modal({
       title: `Display settings — ${d.name}`,
       body: [
-        h('div', { class: 'grid2' },
-          h('label', { class: 'field' }, 'Name', h('input', { value: s.name, oninput: (e) => (s.name = e.target.value) })),
-          h('label', { class: 'field' }, 'Group', h('input', { value: s.group || '', list: 'groups-list2', oninput: (e) => (s.group = e.target.value) }), h('datalist', { id: 'groups-list2' }, groups.map((g) => h('option', { value: g }))))),
+        h('label', { class: 'field' }, 'Name', h('input', { value: s.name, oninput: (e) => (s.name = e.target.value) })),
+        h('div', { class: 'field' }, h('b', { class: 'small' }, 'Groups'), groupPicker(s.groups)),
         h('label', { class: 'field' }, 'Default playlist', h('span', { class: 'hint' }, 'Plays whenever nothing else is scheduled'), playlistSelect(s.defaultPlaylistId, (v) => (s.defaultPlaylistId = v))),
         h('div', { class: 'grid2' },
           h('div', { class: 'field' }, h('b', { class: 'small' }, 'Orientation'), segmented([['landscape', 'Landscape'], ['portrait-left', 'Portrait ⟲'], ['portrait-right', 'Portrait ⟳']], s.orientation || 'landscape', (v) => (s.orientation = v))),
@@ -1445,7 +1841,7 @@
         h('div', { class: 'spacer' }),
         h('button', { class: 'btn', onclick: close }, 'Cancel'),
         h('button', { class: 'btn primary', onclick: async () => {
-          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, group: s.group, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, ticker: s.ticker, background: s.background, notes: s.notes, maintenance: s.maintenance } });
+          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, groups: s.groups, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, ticker: s.ticker, background: s.background, notes: s.notes, maintenance: s.maintenance } });
           close(); toast('Saved — the screen updates in a moment', 'ok'); await loadAll(); renderPage();
         } }, 'Save'),
       ],
