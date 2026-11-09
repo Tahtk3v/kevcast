@@ -1,0 +1,54 @@
+# Runs the server tests and builds the desktop installers on every OS.
+# Download the installers from the run's "Artifacts" section on GitHub.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+
+  desktop:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Build KevCast Player and KevCast Studio
+        run: |
+          npx electron-builder --config electron-builder.player.yml --publish never
+          npx electron-builder --config electron-builder.studio.yml --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false # unsigned builds; add signing certificates for production
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kevcast-desktop-${{ matrix.os }}
+          path: |
+            desktop/dist/*/*.exe
+            desktop/dist/*/*.msi
+            desktop/dist/*/*.dmg
+            desktop/dist/*/*.AppImage
+            desktop/dist/*/*.deb
+          if-no-files-found: warn

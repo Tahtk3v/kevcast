@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>KevCast Player</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="player.css">
+</head>
+<body>
+  <div id="root">
+    <div id="stage">
+      <div class="layer" id="layerA"></div>
+      <div class="layer" id="layerB"></div>
+    </div>
+    <div id="clock" hidden></div>
+    <div id="ticker" hidden><div class="ticker-track"><span id="tickerText"></span></div></div>
+  </div>
+
+  <div id="pairing" class="screen" hidden>
+    <div class="brand">KevCast</div>
+    <h1>Connect this screen</h1>
+    <p>Open the KevCast admin, go to <b>Displays</b> &rarr; <b>Add display</b> and enter this code:</p>
+    <div id="pairCode" class="code">······</div>
+    <p class="muted" id="pairServer"></p>
+  </div>
+
+  <div id="idle" class="screen" hidden>
+    <div class="idle-time" id="idleTime"></div>
+    <div class="idle-date" id="idleDate"></div>
+    <div class="idle-org" id="idleOrg"></div>
+    <p class="muted" id="idleHint">Nothing is scheduled for this screen right now.</p>
+  </div>
+
+  <div id="identify" hidden></div>
+  <div id="status" hidden></div>
+
+  <script src="/shared/schedule.js"></script>
+  <script src="player.js"></script>
+</body>
+</html>
