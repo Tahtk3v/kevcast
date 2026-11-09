@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "description": "KevCast Player (signage app for screens) and KevCast Studio (management app).",
   "author": {
-    "name": "KevCast",
-    "email": "kevcast@example.com"
+    "name": "Kevin B",
+    "email": "hai@bnuy.nl"
   },
   "license": "MIT",
   "private": true,
@@ -21,5 +21,9 @@
     "electron": "^38.0.0",
     "electron-builder": "^26.0.0"
   },
-  "homepage": "https://github.com/tahtk3v/kevcast"
+  "homepage": "https://github.com/tahtk3v/kevcast",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tahtk3v/kevcast.git"
+  }
 }

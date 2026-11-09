@@ -3,17 +3,21 @@
 // What it adds on top of opening /player/ in a browser:
 //   * finds the server on the network by itself (no typing IP addresses on a TV)
 //   * starts at boot/login, fullscreen kiosk, hides the cursor, keeps the screen awake
-//   * offline playback: content is cached on disk and keeps playing if the server is down
+//   * offline playback: the whole schedule's media is downloaded to disk and keeps
+//     playing if the server or network goes down (see offline-cache.js)
+//   * locked: it can only be closed with the exit key combination (default Alt+Q)
 //   * self-healing: reloads after crashes, hangs or lost connections, plus a nightly refresh
 //   * screenshots of what is on screen for the admin
 //   * mass roll-out: reads server + provisioning key from a machine-wide player.json
 //
-// Keyboard (for installers): Ctrl+Shift+K = change server, Ctrl+Shift+R = reset pairing,
-//                            Ctrl+Shift+Q = quit, Ctrl+Shift+W = toggle windowed mode
+// Keyboard (for installers): Alt+Q = exit (configurable with "exitShortcut" in player.json),
+//   Ctrl+Shift+K = change server, Ctrl+Shift+R = reset pairing, Ctrl+Shift+W = windowed mode.
+// Alt+F4, Cmd+Q, closing the window or killing the app from the taskbar are all ignored.
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { app, BrowserWindow, ipcMain, powerSaveBlocker, globalShortcut, screen, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, powerSaveBlocker, powerMonitor, globalShortcut, screen, Menu, protocol } = require('electron');
+const { OfflineCache } = require('./offline-cache');
 const { createConfig } = require('../common/config');
 const { openConnectWindow } = require('../common/connect-window');
 
@@ -29,13 +33,6 @@ if (!app.requestSingleInstanceLock()) {
 const config = createConfig(app, 'player');
 let cfg = config.load();
 
-// Service workers (offline cache) need a "secure" origin. Signage servers on a LAN are
-// usually plain http, so tell Chromium to trust the configured server origin.
-if (cfg.server) {
-  try {
-    app.commandLine.appendSwitch('unsafely-treat-insecure-origin-as-secure', new URL(cfg.server).origin);
-  } catch {}
-}
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling,MediaSessionService');
 if (cfg.disableGpu) app.disableHardwareAcceleration();
@@ -43,8 +40,25 @@ if (cfg.disableGpu) app.disableHardwareAcceleration();
 let win = null;
 let retryTimer = null;
 let hangTimer = null;
+let cache = null;
+
+// ---------------------------------------------------------------------------
+// Exit lock: the player only closes with the exit shortcut (or an OS shutdown).
+// ---------------------------------------------------------------------------
+const EXIT_SHORTCUT = cfg.exitShortcut || 'Alt+Q';
+let allowQuit = false;
+
+function quitForReal() {
+  allowQuit = true;
+  app.quit();
+}
+
+app.on('before-quit', (e) => {
+  if (!allowQuit) e.preventDefault();
+});
 
 function relaunch() {
+  allowQuit = true;
   app.relaunch();
   app.exit(0);
 }
@@ -121,8 +135,26 @@ function createPlayerWindow() {
     if (!url.startsWith(cfg.server) && !url.startsWith('file:')) e.preventDefault();
   });
 
+  // Alt+F4 / the close button / Cmd+W: ignored unless the exit shortcut was used.
+  win.on('close', (e) => {
+    if (!allowQuit) e.preventDefault();
+  });
+  // Windows log-off or shutdown must not be blocked.
+  win.on('session-end', () => { allowQuit = true; });
+  // If something minimises or hides the window, bring it back.
+  win.on('minimize', () => { if (!allowQuit && !cfg.windowed) setTimeout(() => win && win.restore(), 500); });
+
   win.on('closed', () => { win = null; });
   win.loadURL(playerUrl());
+}
+
+function startOfflineCache() {
+  const origin = new URL(cfg.server);
+  cache = new OfflineCache(path.join(app.getPath('userData'), 'offline-cache'), cfg.server, (status) => {
+    if (win && !win.isDestroyed()) win.webContents.send('player:cache-status', status);
+  });
+  // Route the player's requests through the cache (http or https, whatever the server uses).
+  protocol.handle(origin.protocol.replace(':', ''), (request) => cache.handle(request));
 }
 
 function nightlyRefresh() {
@@ -151,7 +183,8 @@ function showConnect(autoConnect) {
       config.save({ server: url });
       relaunch();
     },
-    onClosed: () => { if (!win) app.quit(); },
+    // Without a player window there is nothing to show; keep asking for a server.
+    onClosed: () => { if (!win && !allowQuit) setTimeout(() => showConnect(false), 300); },
   });
 }
 
@@ -169,7 +202,8 @@ ipcMain.handle('player:provisioning', () => {
   if (!cfg.provisioningKey) return null;
   return { key: cfg.provisioningKey, name: cfg.name || os.hostname(), group: cfg.group || '', playlist: cfg.playlist || '' };
 });
-ipcMain.handle('player:info', () => ({ version: VERSION, platform: process.platform, arch: process.arch, hostname: os.hostname() }));
+ipcMain.handle('player:info', () => ({ version: VERSION, platform: process.platform, arch: process.arch, hostname: os.hostname(), exitShortcut: EXIT_SHORTCUT }));
+ipcMain.handle('player:cache-status', () => (cache ? cache.getStatus() : null));
 ipcMain.on('player:retry', () => win && win.loadURL(playerUrl()));
 ipcMain.on('player:change-server', () => showConnect(false));
 
@@ -178,8 +212,14 @@ app.whenReady().then(() => {
   powerSaveBlocker.start('prevent-display-sleep');
   enableAutostart();
 
+  // macOS / Linux shutdown: let the system close the app.
+  powerMonitor.on('shutdown', () => { allowQuit = true; });
+
+  if (!globalShortcut.register(EXIT_SHORTCUT, quitForReal)) {
+    console.warn(`Could not register exit shortcut "${EXIT_SHORTCUT}", falling back to Alt+Q`);
+    globalShortcut.register('Alt+Q', quitForReal);
+  }
   globalShortcut.register('CommandOrControl+Shift+K', () => showConnect(false));
-  globalShortcut.register('CommandOrControl+Shift+Q', () => app.quit());
   globalShortcut.register('CommandOrControl+Shift+W', () => { config.save({ windowed: !cfg.windowed }); relaunch(); });
   globalShortcut.register('CommandOrControl+Shift+R', async () => {
     // Forget the pairing: the screen registers again and shows a new code.
@@ -190,6 +230,7 @@ app.whenReady().then(() => {
   });
 
   if (cfg.server) {
+    startOfflineCache();
     createPlayerWindow();
     nightlyRefresh();
   } else {
@@ -198,4 +239,5 @@ app.whenReady().then(() => {
 });
 
 app.on('second-instance', () => { if (win) { win.show(); win.focus(); } });
-app.on('window-all-closed', () => app.quit());
+app.on('window-all-closed', () => { if (allowQuit) app.quit(); });
+app.on('will-quit', () => globalShortcut.unregisterAll());

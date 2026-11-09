@@ -311,8 +311,11 @@ app.get('/api/player/manifest', playerAuth, (req, res) => {
 });
 
 app.post('/api/player/heartbeat', playerAuth, (req, res) => {
-  const { nowPlaying, resolution } = req.body || {};
+  const { nowPlaying, resolution, cache } = req.body || {};
   const d = req.display;
+  if (cache && typeof cache === 'object') {
+    d.cache = { total: Number(cache.total) || 0, cached: Number(cache.cached) || 0, bytes: Number(cache.bytes) || 0, downloading: !!cache.downloading };
+  }
   d.lastSeen = new Date().toISOString();
   d.ip = req.ip;
   if (resolution) d.resolution = resolution;

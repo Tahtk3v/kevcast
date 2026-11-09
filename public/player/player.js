@@ -55,7 +55,12 @@
   // Boot, pairing and live updates
   // ---------------------------------------------------------------------------
   async function boot() {
-    if ('serviceWorker' in navigator && !previewId) navigator.serviceWorker.register('sw.js').catch(() => {});
+    // In a browser a service worker keeps content offline. The KevCast Player app has
+    // its own disk cache for the whole schedule, so the service worker is not needed there.
+    if ('serviceWorker' in navigator && !previewId) {
+      if (window.kevcastNative) navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+      else navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
     keepAwake();
     setInterval(tickClock, 1000);
     tickClock();
@@ -87,11 +92,25 @@
       setStatus('');
     } catch (e) {
       if (e.message === 'unpaired') return;
-      setStatus(manifest ? 'Offline — playing saved content' : 'Cannot reach the KevCast server — retrying…');
-      if (!manifest) return setTimeout(refresh, 5000);
+      // With saved content we keep playing quietly: no error banners on public screens.
+      if (!manifest) {
+        setStatus('Cannot reach the KevCast server — retrying…');
+        return setTimeout(refresh, 5000);
+      }
     }
     applyDisplaySettings();
     evaluate(true);
+    prefetchInBrowser();
+  }
+
+  // Browser players: ask the service worker to download everything the schedule can show.
+  function prefetchInBrowser() {
+    if (window.kevcastNative || !manifest || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+    const urls = new Set();
+    for (const pl of Object.values(manifest.playlists || {})) {
+      for (const it of pl.items) if ((it.type === 'image' || it.type === 'video') && it.url.startsWith('/media/')) urls.add(it.url);
+    }
+    navigator.serviceWorker.controller.postMessage({ type: 'prefetch', urls: [...urls] });
   }
 
   function connectEvents() {
@@ -108,7 +127,7 @@
       location.reload();
     });
     events.onopen = () => { setStatus(''); };
-    events.onerror = () => { if (manifest) setStatus('Offline — playing saved content'); };
+    events.onerror = () => {};
   }
 
   function heartbeat() {
@@ -119,6 +138,7 @@
       body: JSON.stringify({
         resolution: resolution(),
         nowPlaying: it ? { playlistId: current.playlistId, name: it.name, slide: it.slide || null, slides: it.slides || null } : null,
+        cache: cacheStatus,
       }),
     }).catch(() => {});
   }
@@ -126,6 +146,11 @@
   // The KevCast Player desktop app exposes `kevcastNative` (see desktop/player/preload.js),
   // which can capture the screen. In a plain browser this is simply skipped.
   const native = window.kevcastNative || null;
+  let cacheStatus = null;
+  if (native && native.cacheStatus) {
+    native.cacheStatus().then((s) => { cacheStatus = s; }).catch(() => {});
+    native.onCacheStatus((s) => { cacheStatus = s; });
+  }
   async function sendScreenshot() {
     if (!native || !creds) return;
     try {

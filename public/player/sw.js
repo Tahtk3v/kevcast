@@ -1,6 +1,6 @@
-// Offline support: once a slide/video has been shown it is kept on the device,
-// so screens keep playing through network or server outages.
-const SHELL = 'kevcast-shell-v1';
+// Offline support for browser players: the app shell and all media of the current
+// schedule are kept on the device, so screens keep playing through outages.
+const SHELL = 'kevcast-shell-v2';
 const MEDIA = 'kevcast-media-v1';
 const SHELL_FILES = ['./', 'index.html', 'player.css', 'player.js', '/shared/schedule.js'];
 
@@ -38,5 +38,23 @@ self.addEventListener('fetch', (e) => {
         return res;
       })
       .catch(() => caches.match(e.request, { ignoreSearch: true }))
+  );
+});
+
+// Pre-download all media of the current schedule (sent by player.js) and drop what is no longer used.
+self.addEventListener('message', (e) => {
+  if (!e.data || e.data.type !== 'prefetch') return;
+  const wanted = new Set(e.data.urls.map((u) => new URL(u, location.origin).href));
+  e.waitUntil(
+    caches.open(MEDIA).then(async (c) => {
+      for (const url of wanted) {
+        if (await c.match(url)) continue;
+        try {
+          const res = await fetch(url);
+          if (res.ok && res.status === 200) await c.put(url, res);
+        } catch {}
+      }
+      for (const req of await c.keys()) if (!wanted.has(req.url)) await c.delete(req);
+    })
   );
 });

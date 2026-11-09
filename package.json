@@ -16,5 +16,14 @@
   "dependencies": {
     "express": "^5.1.0",
     "multer": "^2.0.2"
+  },
+  "author": {
+    "name": "Kevin B",
+    "email": "hai@bnuy.nl"
+  },
+  "homepage": "https://github.com/tahtk3v/kevcast",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tahtk3v/kevcast.git"
   }
 }
