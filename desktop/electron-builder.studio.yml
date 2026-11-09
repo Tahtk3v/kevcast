@@ -1,0 +1,40 @@
+# Build:  npm run dist:studio   (run on Windows for .exe/.msi, on macOS for .dmg, on Linux for AppImage/.deb)
+appId: com.kevcast.studio
+productName: KevCast Studio
+artifactName: KevCast-Studio-${version}-${os}-${arch}.${ext}
+directories:
+  output: dist/studio
+extraMetadata:
+  name: kevcast-studio
+  main: studio/main.js
+files:
+  - package.json
+  - common/**
+  - studio/**
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: msi
+      arch: [x64]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: true
+  runAfterFinish: true
+msi:
+  perMachine: true
+  runAfterFinish: true
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+linux:
+  category: Utility
+  target:
+    - target: AppImage
+      arch: [x64, arm64]
+    - target: deb
+      arch: [x64, arm64]
+publish: []

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+  <title>Connect to KevCast</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(circle at 20% 10%, #312e81, #0b1020 60%); color: #e2e8f0; }
+    .card { width: min(520px, 92vw); background: #121a2e; border: 1px solid #23304d; border-radius: 18px; padding: 30px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+    .logo { display: flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+    .mark { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #db2777); }
+    h2 { margin: 18px 0 8px; font-size: 16px; }
+    .muted { color: #94a3b8; }
+    .servers { display: flex; flex-direction: column; gap: 8px; min-height: 52px; }
+    button { font: inherit; cursor: pointer; border-radius: 10px; }
+    .server { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #2e3b5c; background: #0f1628; color: inherit; text-align: left; }
+    .server:hover, .server:focus { border-color: #818cf8; outline: none; background: #1e2448; }
+    .server b { display: block; }
+    .server .go { margin-left: auto; color: #a5b4fc; font-weight: 700; }
+    .row { display: flex; gap: 8px; }
+    input { flex: 1; font: inherit; padding: 11px 12px; border-radius: 10px; border: 1px solid #2e3b5c; background: #0b1020; color: inherit; }
+    input:focus { outline: 2px solid #818cf8; border-color: transparent; }
+    .primary { background: #818cf8; color: #0b1020; border: 0; padding: 11px 18px; font-weight: 700; }
+    .link { background: none; border: 0; color: #a5b4fc; padding: 0; }
+    .err { color: #f87171; min-height: 22px; margin-top: 8px; font-weight: 600; }
+    .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid #475569; border-top-color: #a5b4fc; border-radius: 50%; animation: s 0.8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+    @keyframes s { to { transform: rotate(360deg); } }
+    .foot { display: flex; justify-content: space-between; margin-top: 18px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo"><div class="mark"></div><span id="appName">KevCast</span></div>
+    <div class="muted" id="intro">Choose the KevCast server to connect to.</div>
+
+    <h2>Servers found on your network</h2>
+    <div class="servers" id="servers"><div class="muted"><span class="spin"></span>Searching…</div></div>
+    <div class="foot"><button class="link" id="rescan">Search again</button><span class="muted" id="current"></span></div>
+
+    <h2>Or enter the address</h2>
+    <form class="row" id="manual">
+      <input id="url" placeholder="e.g. 192.168.1.20 or kevcast.company.local:8080" autocomplete="off" spellcheck="false">
+      <button class="primary" type="submit">Connect</button>
+    </form>
+    <div class="err" id="err"></div>
+    <div class="foot"><span class="muted" id="hint"></span><button class="link" id="cancel" hidden>Cancel</button></div>
+  </div>
+  <script src="connect.js"></script>
+</body>
+</html>

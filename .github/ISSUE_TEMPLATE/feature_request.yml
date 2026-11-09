@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest an idea for KevCast
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the situation, e.g. "We have 40 screens and want to …"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How would you like it to work?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds you considered

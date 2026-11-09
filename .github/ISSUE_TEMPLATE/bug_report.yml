@@ -1,0 +1,43 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Upload a .pptx with …
+        2. Add it to a playlist …
+        3. …
+  - type: input
+    id: version
+    attributes:
+      label: KevCast version
+      description: Shown in Settings → Server
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: server-os
+    attributes:
+      label: Server OS
+      options: [Windows, Linux, macOS, Raspberry Pi OS]
+  - type: dropdown
+    id: player
+    attributes:
+      label: Player
+      options: [KevCast Player app (Windows), KevCast Player app (macOS), KevCast Player app (Linux / Raspberry Pi), Browser, Not player related]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Server log (Windows `C:\ProgramData\KevCast\kevcast.log`, Linux `journalctl -u kevcast`)
+      render: text
