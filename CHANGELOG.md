@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-09
+### Fixed
+- **macOS: "KevCast Studio/Player is damaged and can't be opened"** (Dutch: *"is beschadigd"*).
+  - The Mac apps were unsigned, which Apple-silicon Macs report as damaged with no way to open them.
+  - They are now signed ad hoc, so macOS shows the normal "unidentified developer" prompt with **Open Anyway** in *System Settings → Privacy & Security*.
+  - CI now verifies the signature of every Mac app (`codesign --verify --deep --strict`).
+- The docs explain the first start on a Mac, including the `xattr -cr` workaround for 0.2.1 and earlier.
+
 ## [0.2.1] - 2026-11-09
 ### Changed
 - **Node.js 26 LTS** ("Lithium") everywhere:

@@ -61,6 +61,18 @@ jobs:
           npx electron-builder --config electron-builder.player.yml --publish never
           npx electron-builder --config electron-builder.studio.yml --publish never
 
+      - name: Check the macOS apps are signed (unsigned apps show as "damaged")
+        if: runner.os == 'macOS'
+        run: |
+          found=0
+          for app in desktop/dist/*/mac*/*.app; do
+            found=1
+            echo "== $app"
+            codesign --verify --deep --strict --verbose=2 "$app"
+            codesign -dv "$app" 2>&1 | grep -E "Signature|Identifier|Format"
+          done
+          [ "$found" = 1 ] || { echo "::error::No .app bundles found to check"; exit 1; }
+
       - name: Build Windows installers (KevCast Setup + KevCast Server Setup)
         if: runner.os == 'Windows'
         shell: pwsh

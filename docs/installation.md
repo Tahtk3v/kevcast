@@ -59,7 +59,7 @@ Upgrade by running a newer installer over the old one. Uninstall via *Settings â
 ### Linux: kevcast-server .deb
 
 ```bash
-sudo apt install ./kevcast-server_0.2.1_amd64.deb     # arm64 for Raspberry Pi 4/5
+sudo apt install ./kevcast-server_0.2.2_amd64.deb     # arm64 for Raspberry Pi 4/5
 ```
 `apt` pulls in LibreOffice, Poppler and matching fonts automatically. The package:
 - installs to `/opt/kevcast-server` and creates the `kevcast` system user
@@ -71,6 +71,8 @@ sudo apt install ./kevcast-server_0.2.1_amd64.deb     # arm64 for Raspberry Pi 4
 Uninstall with `sudo apt remove kevcast-server`. The data folder is kept.
 
 ### macOS: KevCast-Server .pkg
+The package is not yet signed with an Apple Developer certificate. If macOS refuses to open it, open
+**System Settings â†’ Privacy & Security**, click **Open Anyway** next to the message about the package, and run it again.
 
 Double-click the `.pkg`. The package:
 - installs to `/Library/KevCast Server` and runs as a LaunchDaemon (starts at boot)
