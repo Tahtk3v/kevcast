@@ -16,15 +16,15 @@ if command -v apt-get >/dev/null; then
   apt-get update -y
   apt-get install -y --no-install-recommends ca-certificates curl libreoffice-impress poppler-utils \
     fonts-dejavu fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea
-  if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 18 ]; then
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  if ! command -v node >/dev/null || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 20 ]; then
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
     apt-get install -y nodejs
   fi
 elif command -v dnf >/dev/null; then
   dnf install -y nodejs npm libreoffice-impress poppler-utils dejavu-sans-fonts liberation-fonts google-carlito-fonts || \
   dnf install -y nodejs npm libreoffice-impress poppler-utils
 else
-  echo "Unsupported distribution: install Node.js 18+, LibreOffice and poppler-utils manually, then re-run." >&2
+  echo "Unsupported distribution: install Node.js 20+ (26 LTS recommended), LibreOffice and poppler-utils manually, then re-run." >&2
   exit 1
 fi
 

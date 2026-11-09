@@ -4,7 +4,7 @@
 ;   KevCast-Setup-<ver>.exe         choose Server, Player and/or Studio (components page)
 ;   KevCast-Server-Setup-<ver>.exe  server only (compile without PLAYER_DIR / STUDIO_DIR)
 ;
-; makensis -DVERSION=0.2.0 -DOUTFILE=out.exe -DSERVER_DIR=<staged server> [-DPLAYER_DIR=<win-unpacked>] [-DSTUDIO_DIR=<win-unpacked>]
+; makensis -DVERSION=0.2.1 -DOUTFILE=out.exe -DSERVER_DIR=<staged server> [-DPLAYER_DIR=<win-unpacked>] [-DSTUDIO_DIR=<win-unpacked>]
 ;          -DASSETS=packaging\assets -DSCRIPTS=packaging\windows kevcast-setup.nsi
 ; (see packaging/windows/build.ps1)
 
