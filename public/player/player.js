@@ -140,6 +140,9 @@
         nowPlaying: it ? { playlistId: current.playlistId, name: it.name, slide: it.slide || null, slides: it.slides || null } : null,
         cache: cacheStatus,
       }),
+    }).then((r) => {
+      // Fallback when live events are blocked (e.g. by a proxy): notice pairing via the heartbeat.
+      if (r && r.approved && manifest && !manifest.display.approved) refresh();
     }).catch(() => {});
   }
 
