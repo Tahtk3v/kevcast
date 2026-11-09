@@ -1,0 +1,44 @@
+# Dependabot keeps KevCast's dependencies up to date.
+# Security updates (for known vulnerabilities) are opened as soon as an advisory is published,
+# once "Dependabot security updates" is switched on under Settings → Code security.
+# The schedule below also opens regular version-update pull requests.
+version: 2
+updates:
+  # KevCast Server (Express, Multer)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(server)"
+    groups:
+      server-minor-and-patch:
+        update-types: [minor, patch]
+
+  # KevCast Player and Studio (Electron, electron-builder)
+  - package-ecosystem: npm
+    directory: /desktop
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(desktop)"
+    groups:
+      desktop-minor-and-patch:
+        update-types: [minor, patch]
+    # Electron majors are not grouped, so each arrives as its own pull request to review
+    # (they change Chromium and APIs). They are not ignored: security fixes must still come in.
+
+  # GitHub Actions used by the build workflow
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "deps(ci)"
+    groups:
+      actions:
+        patterns: ["*"]

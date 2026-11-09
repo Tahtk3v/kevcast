@@ -59,6 +59,12 @@ See [Architecture](architecture.md#components).
 - New schedule logic goes in `shared/schedule.js`, with a test in `test/schedule.test.js`.
 - API changes: update [docs/api.md](api.md) and add to `test/api.test.js`.
 
+## Dependency updates
+Dependabot ([`.github/dependabot.yml`](../.github/dependabot.yml)) opens pull requests for npm packages (server and desktop)
+and GitHub Actions. Security fixes arrive as soon as an advisory is published. Enable it under
+**Settings → Code security** (see [SECURITY.md](../SECURITY.md#dependency-updates)).
+Electron major versions arrive as separate pull requests: check the player (offline cache, exit lock, web pages) before merging one.
+
 ## Releasing
 1. Update `version` in `package.json` and `desktop/package.json`, and add an entry to `CHANGELOG.md`.
 2. Commit, then tag: `git tag v0.2.0 && git push --tags`.

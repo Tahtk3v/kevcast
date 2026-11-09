@@ -33,6 +33,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - **Displays page**: select several screens, then *Add to group / Remove from group / Set default playlist / Send / Schedule*. Filter by group.
 - **Schedule tables**: select several entries, then *Enable / Disable / Change screens / Priority / Remove*. The schedule views can filter on a whole group.
 - **KevCast Studio, This computer**: browse quick folders (Desktop, Documents, Downloads, OneDrive, drives, recent folders), see which files are already uploaded, and upload with progress. Includes a native **Browse…** dialog. Uploads stream from disk.
+- Dependabot configuration for npm (server and desktop) and GitHub Actions.
 - **File → Upload files…** (Ctrl/Cmd+U) in Studio. A playlist's **Upload** button adds the uploaded files to that playlist.
 
 ### Changed
