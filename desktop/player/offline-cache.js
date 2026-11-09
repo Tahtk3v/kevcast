@@ -99,6 +99,20 @@ class OfflineCache {
     return net.fetch(request, opts);
   }
 
+  /**
+   * Other http sites (web-page items) bypass webRequest because this handler serves them,
+   * so drop the "do not embed me" headers here as well (see allowEmbeddingWebPages in main.js).
+   */
+  async passThroughEmbeddable(request) {
+    const res = await this.network(request);
+    const headers = new Headers(res.headers);
+    headers.delete('x-frame-options');
+    const csp = headers.get('content-security-policy');
+    if (csp) headers.set('content-security-policy', csp.split(';').filter((d) => !/^\s*frame-ancestors/i.test(d)).join(';'));
+    const noBody = [101, 204, 205, 304].includes(res.status);
+    return new Response(noBody ? null : res.body, { status: res.status, statusText: res.statusText, headers });
+  }
+
   setOffline(offline) {
     if (this.status.offline !== offline) {
       this.status.offline = offline;
@@ -111,7 +125,8 @@ class OfflineCache {
   // ---------------------------------------------------------------------------
   async handle(request) {
     const url = new URL(request.url);
-    if (url.origin !== this.origin || request.method !== 'GET') return this.network(request);
+    if (url.origin !== this.origin) return this.passThroughEmbeddable(request);
+    if (request.method !== 'GET') return this.network(request);
     const p = url.pathname;
 
     if (p.startsWith('/media/')) {

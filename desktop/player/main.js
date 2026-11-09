@@ -16,8 +16,9 @@
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { app, BrowserWindow, ipcMain, powerSaveBlocker, powerMonitor, globalShortcut, screen, Menu, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, powerSaveBlocker, powerMonitor, globalShortcut, screen, Menu, protocol, session } = require('electron');
 const { OfflineCache } = require('./offline-cache');
+const { execFile } = require('child_process');
 const { createConfig } = require('../common/config');
 const { openConnectWindow } = require('../common/connect-window');
 
@@ -157,6 +158,57 @@ function startOfflineCache() {
   protocol.handle(origin.protocol.replace(':', ''), (request) => cache.handle(request));
 }
 
+// ---------------------------------------------------------------------------
+// Web pages in playlists: many sites (departure boards, traffic maps, dashboards) forbid being
+// shown inside another page with X-Frame-Options or CSP frame-ancestors. A signage screen is
+// a display, not a browser, so the player drops those two restrictions for embedded pages.
+// ---------------------------------------------------------------------------
+function allowEmbeddingWebPages() {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    if (details.resourceType !== 'subFrame') return callback({});
+    const headers = { ...details.responseHeaders };
+    for (const name of Object.keys(headers)) {
+      const lower = name.toLowerCase();
+      if (lower === 'x-frame-options') delete headers[name];
+      if (lower === 'content-security-policy') {
+        headers[name] = headers[name].map((v) => v.split(';').filter((d) => !/^\s*frame-ancestors/i.test(d)).join(';'));
+      }
+    }
+    callback({ responseHeaders: headers });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Weekly restart (set per display in the Web Studio; default Sunday 03:00).
+// Windows: the computer restarts, so pending Windows updates get installed.
+// macOS / Linux: the player app restarts (set "rebootCommand" in player.json to reboot the OS).
+// ---------------------------------------------------------------------------
+let maintenance = cfg.maintenance || { weeklyRestart: true, day: 0, time: '03:00' };
+
+function checkWeeklyRestart() {
+  if (!maintenance || !maintenance.weeklyRestart || cfg.weeklyRestart === false) return;
+  const now = new Date();
+  const [hh, mm] = String(maintenance.time || '03:00').split(':').map(Number);
+  const due = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hh, mm || 0, 0);
+  const minutesLate = (now - due) / 60000;
+  // Run within 30 minutes of the planned time (covers a computer that was briefly asleep).
+  if (now.getDay() !== Number(maintenance.day) || minutesLate < 0 || minutesLate > 30) return;
+  const today = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+  if (config.load().lastWeeklyRestart === today) return; // already done today
+  config.save({ lastWeeklyRestart: today });
+  console.log('[maintenance] weekly restart');
+  allowQuit = true;
+  if (process.platform === 'win32') {
+    execFile('shutdown.exe', ['/r', '/t', '60', '/c', 'KevCast weekly restart (installs updates)'], { windowsHide: true }, (err) => {
+      if (err) relaunch(); // no permission to restart Windows: at least restart the player
+    });
+  } else if (cfg.rebootCommand) {
+    execFile('/bin/sh', ['-c', cfg.rebootCommand], (err) => { if (err) relaunch(); });
+  } else {
+    relaunch();
+  }
+}
+
 function nightlyRefresh() {
   // Reload once a night (default 04:00) to keep long-running screens fresh.
   const [hh, mm] = String(cfg.nightlyReload || '04:00').split(':').map(Number);
@@ -204,6 +256,12 @@ ipcMain.handle('player:provisioning', () => {
 });
 ipcMain.handle('player:info', () => ({ version: VERSION, platform: process.platform, arch: process.arch, hostname: os.hostname(), exitShortcut: EXIT_SHORTCUT }));
 ipcMain.handle('player:cache-status', () => (cache ? cache.getStatus() : null));
+ipcMain.on('player:maintenance', (e, m) => {
+  if (!m || typeof m !== 'object') return;
+  maintenance = { weeklyRestart: !!m.weeklyRestart, day: Number(m.day) || 0, time: String(m.time || '03:00') };
+  // Remember it, so the restart also happens when the server is unreachable.
+  if (JSON.stringify(cfg.maintenance) !== JSON.stringify(maintenance)) cfg = config.save({ maintenance });
+});
 ipcMain.on('player:retry', () => win && win.loadURL(playerUrl()));
 ipcMain.on('player:change-server', () => showConnect(false));
 
@@ -211,6 +269,8 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   powerSaveBlocker.start('prevent-display-sleep');
   enableAutostart();
+  allowEmbeddingWebPages();
+  setInterval(checkWeeklyRestart, 60 * 1000);
 
   // macOS / Linux shutdown: let the system close the app.
   powerMonitor.on('shutdown', () => { allowQuit = true; });
