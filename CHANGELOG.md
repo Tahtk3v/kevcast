@@ -4,6 +4,19 @@ All notable changes to KevCast are listed here. The format follows [Keep a Chang
 and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- **Separate installers** for the Server, Player and Studio.
+  - The server installers bundle their own Node.js runtime:
+    - Windows `KevCast-Server-Setup.exe` (with Poppler included)
+    - Linux `kevcast-server` `.deb` (amd64 and arm64)
+    - macOS `.pkg`
+  - **KevCast Setup** for Windows lets you choose Server (with optional LibreOffice), Player and/or Studio.
+- Installing the server adds a **KevCast Web Studio** desktop and menu shortcut.
+- **Start page** at the server address with a link to the Web Studio and the exact page browser-based screens must open. It is also shown on the Displays page and by the installers.
+- App icons for KevCast Player, KevCast Studio and the server.
+
+### Fixed
+- The Windows MSI build failed because no application icon was set.
 
 ## [0.1.0] - 2026-11-09
 ### Added

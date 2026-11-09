@@ -115,7 +115,17 @@ Only the most recent screenshot per display is kept on the server.
 
 ## Browser players
 
-Any modern browser can be a player: open `http://<server>:8080/player/`.
+Any modern browser can be a player. **Make the browser open this page:**
+
+```
+http://<server-address>:8080/player/
+```
+
+- `<server-address>` is the IP address or name of the computer running KevCast Server, e.g. `http://192.168.1.20:8080/player/`.
+- Not sure of the address? Open `http://<server>:8080/` (the start page) on any computer, or look at **Displays → Connect another screen** in the Web Studio. Both list the exact player address with a copy button. The Windows installer also shows it on its last page.
+- Don't use `localhost` unless the browser runs on the server itself.
+- The page shows a 6-character code. Enter it in **Displays → Add display**.
+- Set this page as the browser's **start page** or kiosk URL, so the screen comes back by itself after a restart.
 
 - **Fullscreen**: press F11, double-click, or press `F` on the page. On Chrome/Edge use kiosk mode, for example:
   `msedge --kiosk http://server:8080/player/ --edge-kiosk-type=fullscreen`

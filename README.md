@@ -26,16 +26,28 @@ KevCast takes its inspiration from EasyScreen and is a simpler alternative to Xi
 
 ## Get started
 
-| | |
-|---|---|
-| **1. Install the server** | Windows: double-click `install\windows\install.bat` · Linux: `sudo ./install/linux/install.sh` · macOS: `./install/macos/install.sh` |
-| **2. Open the admin** | `http://<server>:8080/admin/` and create your account |
-| **3. Add content** | Drag a PowerPoint onto **Media**, then add it to a playlist |
-| **4. Connect a screen** | Install **KevCast Player** on the screen (or open `http://<server>:8080/player/` in a browser) and enter the code it shows under **Displays → Add display** |
-| **5. Schedule** | Drag on the **Schedule** calendar, or use **Send to screens** |
+Each part has its own installer. Install only what a computer needs:
 
-The desktop installers (`.exe`, `.msi`, `.dmg`, `.AppImage`, `.deb`) are produced by the
-[Build workflow](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml). See [docs/development.md](docs/development.md) to build them yourself.
+| Installer | Install on | Windows | macOS | Linux / Raspberry Pi |
+|---|---|---|---|---|
+| **KevCast Setup**: pick Server, Player and/or Studio | any Windows PC | `KevCast-Setup-*.exe` | – | – |
+| **KevCast Server** | one computer per organisation | `KevCast-Server-Setup-*.exe` | `KevCast-Server-*.pkg` | `kevcast-server_*.deb` |
+| **KevCast Player** | each computer behind a screen | `.exe` / `.msi` | `.dmg` | `.deb` / `.AppImage` |
+| **KevCast Studio** (optional) | admins' PCs | `.exe` / `.msi` | `.dmg` | `.deb` / `.AppImage` |
+
+Download them from the latest [Build workflow run](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml) (**Artifacts**).
+
+1. **Install the server.** It adds a **KevCast Web Studio** icon to the desktop.
+2. **Open KevCast Web Studio** and create your account.
+3. **Add content**: drag a PowerPoint onto **Media**, then add it to a playlist.
+4. **Connect a screen**, in one of two ways:
+   - install **KevCast Player** (it finds the server automatically), or
+   - point any browser at **`http://<server>:8080/player/`**
+
+   The screen shows a code. Enter it under **Displays → Add display**.
+5. **Schedule**: drag on the **Schedule** calendar, or use **Send to screens**.
+
+Tip: open `http://<server>:8080/` on any computer for a start page that links to the Web Studio and shows the exact player address.
 
 ## Documentation
 

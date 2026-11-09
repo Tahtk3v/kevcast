@@ -15,7 +15,76 @@ plus your media files. It needs no database server, web server, Docker or licenc
 
 Players only talk to the server, never to the internet. An isolated signage network works fine.
 
-## Windows
+## Installers (recommended)
+
+Every component has its own installer, so you only install what a computer needs.
+Download them from the latest [Build workflow run](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml) (**Artifacts**), or build them yourself (see [packaging/README.md](../packaging/README.md)).
+
+| Component | Install it on | Windows | macOS | Linux / Raspberry Pi |
+|---|---|---|---|---|
+| **Everything, pick what you need** | any Windows PC | `KevCast-Setup-x.y.z-win-x64.exe` | – | – |
+| **KevCast Server** | one computer per organisation | `KevCast-Server-Setup-x.y.z-win-x64.exe` | `KevCast-Server-x.y.z-mac-arm64.pkg` / `-x64.pkg` | `kevcast-server_x.y.z_amd64.deb` / `_arm64.deb` |
+| **KevCast Player** | every computer behind a screen | `KevCast-Player-…exe` / `.msi` | `KevCast-Player-….dmg` | `KevCast-Player-….deb` / `.AppImage` |
+| **KevCast Studio** | admins' PCs (optional, the Web Studio works in any browser) | `KevCast-Studio-…exe` / `.msi` | `KevCast-Studio-….dmg` | `KevCast-Studio-….deb` / `.AppImage` |
+
+The server installers include their own Node.js runtime, so nothing has to be installed beforehand.
+
+### Windows: KevCast Setup
+
+`KevCast-Setup` asks which parts to install:
+
+| Option | What it does |
+|---|---|
+| **Server** | Installs to `C:\Program Files\KevCast\Server`, with data in `C:\ProgramData\KevCast`. Registers a background service (Task Scheduler, runs as SYSTEM at boot, restarts on failure) and opens the firewall (TCP 8080, UDP 41234). Puts a **KevCast Web Studio** icon on the desktop. |
+| ↳ **LibreOffice** | Ticked if it isn't installed yet. Installs LibreOffice with winget (needs internet), for PowerPoint conversion. Poppler is already included. |
+| **KevCast Player** | For a computer connected to a screen. Starts at sign-in for every user and adds a desktop shortcut. |
+| **KevCast Studio** | Desktop management app with a desktop shortcut |
+
+`KevCast-Server-Setup` is the same installer with only the server.
+
+When it finishes, the installer:
+- shows the address that browser-based screens must open (`http://<computer-name>:8080/player/`)
+- can open the Web Studio right away
+
+The Start menu folder **KevCast** contains:
+- **KevCast Web Studio**
+- **Connect a screen**: the server's start page, showing the exact player address
+- the server log and the data folder
+- the uninstaller
+
+To change the port, edit `C:\Program Files\KevCast\Server\kevcast-server.cmd` (`set PORT=…`). Then restart the **KevCast Server** task in Task Scheduler, or reboot. Re-running the installer keeps the port you set.
+
+Upgrade by running a newer installer over the old one. Uninstall via *Settings → Apps → KevCast*. Your content in `C:\ProgramData\KevCast` is always kept.
+
+### Linux: kevcast-server .deb
+
+```bash
+sudo apt install ./kevcast-server_0.1.0_amd64.deb     # arm64 for Raspberry Pi 4/5
+```
+`apt` pulls in LibreOffice, Poppler and matching fonts automatically. The package:
+- installs to `/opt/kevcast-server` and creates the `kevcast` system user
+- stores data in `/var/lib/kevcast`
+- starts the `kevcast` systemd service
+- adds **KevCast Web Studio** to the application menu and to your desktop
+- reads its settings from `/etc/default/kevcast` (`PORT=8080`). Restart with `sudo systemctl restart kevcast` after changing them.
+
+Uninstall with `sudo apt remove kevcast-server`. The data folder is kept.
+
+### macOS: KevCast-Server .pkg
+
+Double-click the `.pkg`. The package:
+- installs to `/Library/KevCast Server` and runs as a LaunchDaemon (starts at boot)
+- stores data in `/Library/Application Support/KevCast`
+- puts **KevCast Web Studio** on the desktop and in Applications
+- opens the start page when it's done
+
+For PowerPoint conversion, also install LibreOffice and Poppler: `brew install --cask libreoffice && brew install poppler`. Or download LibreOffice from libreoffice.org; the Web Studio dashboard warns while anything is missing.
+
+## Install scripts (alternative)
+
+Prefer a script, or installing from a git checkout? Use the scripts below. They install the same server, using the system's Node.js.
+
+### Windows script
 
 1. Download the repository (**Code → Download ZIP** on GitHub) and extract it, or `git clone` it.
 2. Double-click **`install\windows\install.bat`** and accept the administrator (UAC) prompt.
@@ -47,7 +116,7 @@ Get-Content C:\ProgramData\KevCast\kevcast.log -Tail 50 -Wait
 
 **Uninstall**: run `install\windows\uninstall.ps1` as administrator. Your content in `C:\ProgramData\KevCast` is kept.
 
-## Linux (Ubuntu, Debian, Raspberry Pi OS, Fedora, RHEL)
+### Linux script (Ubuntu, Debian, Raspberry Pi OS, Fedora, RHEL)
 
 ```bash
 git clone https://github.com/tahtk3v/kevcast.git
@@ -76,7 +145,7 @@ journalctl -u kevcast -f
 > presentation uses a corporate font, install it on the server (on Linux: copy it to
 > `/usr/local/share/fonts` and run `fc-cache -f`), then click **Re-convert** on the media item.
 
-## macOS
+### macOS script
 
 ```bash
 ./install/macos/install.sh
@@ -96,8 +165,10 @@ See [Configuration](configuration.md) for all environment variables.
 
 ## First run
 
-Open `http://<server-address>:8080/admin/`. The first visit asks you to create the administrator account and
+Open **KevCast Web Studio**, the desktop icon or `http://<server-address>:8080/admin/`. The first visit asks you to create the administrator account and
 name your organisation. That name is shown on idle screens and in the apps' server list.
+
+Opening the server address without a path, `http://<server-address>:8080/`, shows a start page. It has a button to the Web Studio and the exact address that browser-based screens must open.
 
 Next, check **Settings → Server**: both *LibreOffice* and *Slide renderer* should show **OK**.
 
@@ -156,8 +227,8 @@ data/
 
 ## Upgrading
 
-1. Download the new version.
-2. Run the same install script again. It replaces the program files and leaves the data folder alone.
+1. Get the new version.
+2. Run the newer installer, `apt install` the newer `.deb`, or run the same install script again. The program files are replaced and the data folder is left alone.
 3. Players notice the new player code within a minute, or at the nightly refresh. Use **Reload** on a group to update them straight away.
 
 ## Ports

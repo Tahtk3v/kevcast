@@ -114,7 +114,7 @@ Screens carry a copy of the schedule, so switches happen on time even when the s
 ## Displays and groups
 
 ### Adding a display
-1. Start **KevCast Player** on the screen, or open `http://<server>:8080/player/` in its browser.
+1. Start **KevCast Player** on the screen, or open `http://<server>:8080/player/` in its browser. The **Connect another screen** card at the bottom of the Displays page shows the exact address, with a copy button.
 2. The screen shows a 6-character code. The **Displays** menu gets a "1 new" badge.
 3. Click **Add display** and fill in:
    - the code
