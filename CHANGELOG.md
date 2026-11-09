@@ -5,6 +5,18 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-09
+### Changed
+- **Node.js 26 LTS** ("Lithium") everywhere:
+  - The server installers (Windows, macOS, Linux) now bundle Node.js 26 instead of 22.
+  - CI runs on 26.
+  - The Linux install script installs the current LTS from NodeSource when the system's Node.js is too old.
+- The minimum Node.js version for running the server from source is now 20. Node.js 18 is end-of-life.
+- GitHub Actions updated: `checkout` v7, `setup-node` v7, `upload-artifact` v7, `download-artifact` v8. This removes the "Node.js 20 is deprecated" warnings in the workflow runs.
+
+### Added
+- **Automatic releases.** Pushing a version tag (`v0.2.1`) builds every installer and publishes a GitHub Release with all of them attached. The release notes are this changelog's section for that version. The release job checks that the tag matches `package.json`.
+
 ## [0.2.0] - 2026-11-09
 ### Security
 - **Electron 38.8.6 → 42.11.18** for KevCast Player and KevCast Studio. This fixes [GHSA-jr5w-w6x2-84p9](https://github.com/electron/electron/security/advisories/GHSA-jr5w-w6x2-84p9), the mitigation for compromised eMudhra intermediate certificates, and includes later Chromium and V8 security backports. (Reported by Dependabot in #3.)

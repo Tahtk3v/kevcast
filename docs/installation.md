@@ -10,7 +10,7 @@ plus your media files. It needs no database server, web server, Docker or licenc
 | OS | Windows 10/11 or Server 2019+, Ubuntu 20.04+, Debian 11+, Raspberry Pi OS (64-bit), Fedora/RHEL 9, macOS 12+ | Any of these on an always-on machine |
 | CPU / RAM | 2 cores, 2 GB | 4 cores, 4 GB (PowerPoint conversion uses LibreOffice) |
 | Disk | 2 GB + your media | SSD |
-| Software | Node.js 18+, LibreOffice, Poppler (`pdftoppm`) or Ghostscript | Installed by the scripts below |
+| Software | Node.js 20+ (26 LTS recommended; the installers include it), LibreOffice, Poppler (`pdftoppm`) or Ghostscript | Installed by the scripts below |
 | Network | TCP **8080** (web/admin/players), UDP **41234** (auto-discovery, optional) | Fixed IP address or DNS name |
 
 Players only talk to the server, never to the internet. An isolated signage network works fine.
@@ -59,7 +59,7 @@ Upgrade by running a newer installer over the old one. Uninstall via *Settings â
 ### Linux: kevcast-server .deb
 
 ```bash
-sudo apt install ./kevcast-server_0.2.0_amd64.deb     # arm64 for Raspberry Pi 4/5
+sudo apt install ./kevcast-server_0.2.1_amd64.deb     # arm64 for Raspberry Pi 4/5
 ```
 `apt` pulls in LibreOffice, Poppler and matching fonts automatically. The package:
 - installs to `/opt/kevcast-server` and creates the `kevcast` system user
@@ -125,7 +125,7 @@ sudo ./install/linux/install.sh
 ```
 
 The script ([`install.sh`](../install/linux/install.sh)):
-- installs Node.js (NodeSource 22.x if the distribution's version is too old), `libreoffice-impress`, `poppler-utils` and fonts that match the Office fonts (Carlito = Calibri, Caladea = Cambria, Liberation = Arial/Times)
+- installs Node.js (the current LTS from NodeSource if the distribution's version is too old), `libreoffice-impress`, `poppler-utils` and fonts that match the Office fonts (Carlito = Calibri, Caladea = Cambria, Liberation = Arial/Times)
 - copies the program to `/opt/kevcast` and creates a `kevcast` system user
 - stores data in `/var/lib/kevcast`
 - creates and starts the systemd service `kevcast`

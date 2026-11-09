@@ -4,6 +4,8 @@
 #                     KevCast Player and KevCast Studio (.exe and .msi)
 #   KevCast-macOS   : KevCast-Server .pkg, KevCast Player and KevCast Studio .dmg
 #   KevCast-Linux   : kevcast-server .deb, KevCast Player and KevCast Studio (.deb, .AppImage), x64 + arm64
+# Pushing a version tag (git tag v1.2.3 && git push origin v1.2.3) also publishes a GitHub Release
+# with every installer attached and the matching CHANGELOG.md section as release notes.
 name: Build
 
 on:
@@ -17,10 +19,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
       - run: npm ci
       - run: npm test
 
@@ -41,10 +43,10 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: false # unsigned builds; add signing certificates for production
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 26
 
       - name: Build KevCast Player and KevCast Studio
         working-directory: desktop
@@ -70,7 +72,7 @@ jobs:
           bash packaging/macos/build-pkg.sh arm64
           bash packaging/macos/build-pkg.sh x64
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: KevCast-${{ matrix.name }}
           path: |
@@ -83,3 +85,52 @@ jobs:
             desktop/dist/*/*.AppImage
             desktop/dist/*/*.deb
           if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: installers
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check the tag matches package.json
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > release-notes.md
+          {
+            echo ""
+            echo "## Downloads"
+            echo "| Install on | Windows | macOS | Linux / Raspberry Pi |"
+            echo "|---|---|---|---|"
+            echo "| Any Windows PC (choose Server, Player, Studio) | \`KevCast-Setup-*.exe\` | – | – |"
+            echo "| The server (one per organisation) | \`KevCast-Server-Setup-*.exe\` | \`KevCast-Server-*-mac-*.pkg\` | \`kevcast-server_*.deb\` |"
+            echo "| Each screen | \`KevCast-Player-*.exe\` / \`.msi\` | \`KevCast-Player-*.dmg\` | \`KevCast-Player-*.deb\` / \`.AppImage\` |"
+            echo "| Admin PCs (optional) | \`KevCast-Studio-*.exe\` / \`.msi\` | \`KevCast-Studio-*.dmg\` | \`KevCast-Studio-*.deb\` / \`.AppImage\` |"
+            echo ""
+            echo "See the [installation guide](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/docs/installation.md)."
+          } >> release-notes.md
+          cat release-notes.md
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          pattern: KevCast-*
+          merge-multiple: true
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mapfile -t files < <(find artifacts -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' -o -name '*.pkg' -o -name '*.deb' -o -name '*.AppImage' \) | sort)
+          printf '%s\n' "${files[@]}"
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "KevCast ${GITHUB_REF_NAME#v}" --notes-file release-notes.md --verify-tag

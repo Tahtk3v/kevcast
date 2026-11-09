@@ -4,7 +4,7 @@
 //   <out>/node/     a bundled Node.js runtime (no Node install needed on the target)
 //   <out>/poppler/  (Windows only) Poppler binaries for rendering slides
 //
-// Usage: node packaging/stage-server.js --platform win|linux|darwin --arch x64|arm64 --out <dir> [--node-major 22] [--skip-poppler]
+// Usage: node packaging/stage-server.js --platform win|linux|darwin --arch x64|arm64 --out <dir> [--node-major 26] [--skip-poppler]
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -17,7 +17,7 @@ const args = Object.fromEntries(
 const PLATFORM = args.platform;
 const ARCH = args.arch || 'x64';
 const OUT = path.resolve(args.out || `packaging-out/server-${PLATFORM}-${ARCH}`);
-const NODE_MAJOR = args['node-major'] || '22';
+const NODE_MAJOR = args['node-major'] || '26';
 const ROOT = path.resolve(__dirname, '..');
 
 if (!['win', 'linux', 'darwin'].includes(PLATFORM)) {

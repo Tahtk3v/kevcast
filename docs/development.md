@@ -1,7 +1,7 @@
 # Development
 
 ## Prerequisites
-- Node.js 20+ (the server also runs on 18)
+- Node.js 26 LTS (the server supports 20 and newer; CI and the installers use 26)
 - LibreOffice and Poppler, to test PowerPoint conversion
 - For the desktop apps: the OS you build installers for (Windows for `.exe/.msi`, macOS for `.dmg`)
 
@@ -66,6 +66,14 @@ and GitHub Actions. Security fixes arrive as soon as an advisory is published. E
 Electron major versions arrive as separate pull requests: check the player (offline cache, exit lock, web pages) before merging one.
 
 ## Releasing
-1. Update `version` in `package.json` and `desktop/package.json`, and add an entry to `CHANGELOG.md`.
-2. Commit, then tag: `git tag v0.2.0 && git push --tags`.
-3. The *Build* workflow produces the installers. Attach them to a GitHub Release.
+1. Update `version` in `package.json` and `desktop/package.json` (`npm version x.y.z --no-git-tag-version` in both folders).
+2. Add a `## [x.y.z] - date` section to `CHANGELOG.md`. It becomes the release notes.
+3. Merge to `main`, then tag that commit and push the tag:
+   ```bash
+   git tag v0.2.1
+   git push origin v0.2.1
+   ```
+4. The *Build* workflow:
+   - builds every installer on Windows, macOS and Linux
+   - checks that the tag matches `package.json`
+   - publishes the **GitHub Release** with all installers attached
