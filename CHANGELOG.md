@@ -16,7 +16,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - **Electron 42.11.18 → 45.2.3** for KevCast Player and KevCast Studio (newer Chromium). This applies Dependabot's #5. The GitHub Actions updates above cover Dependabot's #4.
 
 ### Added
-- **Automatic releases.** Pushing a version tag (`v0.2.1`) builds every installer and publishes a GitHub Release with all of them attached. The release notes are this changelog's section for that version. The release job checks that the tag matches `package.json`.
+- **Automatic releases.** In GitHub, go to **Actions → Build → Run workflow** on `main` and tick **release**, or push a version tag (`v0.2.1`). Either builds every installer and publishes a GitHub Release with all of them attached. The button creates the tag itself. The release notes are this changelog's section for that version. The release job checks that the tag matches `package.json`.
 
 ## [0.2.0] - 2026-11-09
 ### Security

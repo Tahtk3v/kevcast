@@ -4,8 +4,9 @@
 #                     KevCast Player and KevCast Studio (.exe and .msi)
 #   KevCast-macOS   : KevCast-Server .pkg, KevCast Player and KevCast Studio .dmg
 #   KevCast-Linux   : kevcast-server .deb, KevCast Player and KevCast Studio (.deb, .AppImage), x64 + arm64
-# Pushing a version tag (git tag v1.2.3 && git push origin v1.2.3) also publishes a GitHub Release
-# with every installer attached and the matching CHANGELOG.md section as release notes.
+# Releases: Actions → Build → "Run workflow" on main with "release" ticked, or push a tag
+# (git tag v1.2.3 && git push origin v1.2.3). Both publish a GitHub Release with every installer
+# attached and the matching CHANGELOG.md section as release notes.
 name: Build
 
 on:
@@ -14,6 +15,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: Publish a GitHub Release for the version in package.json (creates the vX.Y.Z tag)
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -87,24 +93,37 @@ jobs:
           if-no-files-found: error
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release && github.ref == 'refs/heads/main')
     needs: installers
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
-      - name: Check the tag matches package.json
+      - name: Work out the release tag
         run: |
           version="$(node -p "require('./package.json').version")"
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
-            exit 1
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+            if [ "v$version" != "$tag" ]; then
+              echo "::error::Tag $tag does not match package.json version $version"
+              exit 1
+            fi
+          else
+            tag="v$version"
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "::error::Release $tag already exists. Bump the version in package.json first."
+              exit 1
+            fi
           fi
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "Releasing $tag from $GITHUB_SHA"
       - name: Release notes from CHANGELOG.md
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          awk -v v="$version" '
+          awk -v v="$VERSION" '
             $0 ~ "^## \\[" v "\\]" { on = 1; next }
             on && /^## \[/ { exit }
             on { print }
@@ -119,7 +138,7 @@ jobs:
             echo "| Each screen | \`KevCast-Player-*.exe\` / \`.msi\` | \`KevCast-Player-*.dmg\` | \`KevCast-Player-*.deb\` / \`.AppImage\` |"
             echo "| Admin PCs (optional) | \`KevCast-Studio-*.exe\` / \`.msi\` | \`KevCast-Studio-*.dmg\` | \`KevCast-Studio-*.deb\` / \`.AppImage\` |"
             echo ""
-            echo "See the [installation guide](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/docs/installation.md)."
+            echo "See the [installation guide](https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/docs/installation.md)."
           } >> release-notes.md
           cat release-notes.md
       - uses: actions/download-artifact@v8
@@ -128,9 +147,12 @@ jobs:
           pattern: KevCast-*
           merge-multiple: true
       - name: Publish the GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           mapfile -t files < <(find artifacts -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' -o -name '*.pkg' -o -name '*.deb' -o -name '*.AppImage' \) | sort)
           printf '%s\n' "${files[@]}"
-          gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "KevCast ${GITHUB_REF_NAME#v}" --notes-file release-notes.md --verify-tag
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            gh release create "$TAG" "${files[@]}" --title "KevCast $VERSION" --notes-file release-notes.md --verify-tag
+          else
+            # Creates the tag on exactly the commit these installers were built from.
+            gh release create "$TAG" "${files[@]}" --title "KevCast $VERSION" --notes-file release-notes.md --target "$GITHUB_SHA"
+          fi
