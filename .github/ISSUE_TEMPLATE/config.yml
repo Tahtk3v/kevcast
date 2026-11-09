@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/tahtk3v/kevcast/tree/main/docs
+    about: Installation, user guide, roll-out and troubleshooting
+  - name: Security vulnerability
+    url: https://github.com/tahtk3v/kevcast/security/advisories/new
+    about: Please report security issues privately
