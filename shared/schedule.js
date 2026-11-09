@@ -58,14 +58,20 @@
     return entry.mediaId ? `media:${entry.mediaId}` : entry.playlistId || null;
   }
 
+  /** Group names a display belongs to (a display can be in several groups). */
+  function groupsOf(display) {
+    if (!display) return [];
+    if (Array.isArray(display.groups)) return display.groups;
+    return display.group ? [display.group] : []; // older data: a single group
+  }
+
   function appliesToDisplay(entry, display) {
     const t = entry.targets || {};
     const ds = t.displays || [];
     const gs = t.groups || [];
     if (!ds.length && !gs.length) return true;
     if (display && ds.includes(display.id)) return true;
-    if (display && display.group && gs.includes(display.group)) return true;
-    return false;
+    return groupsOf(display).some((g) => gs.includes(g));
   }
 
   /** Does the entry run on calendar date d (ignoring the time of day)? */
@@ -139,7 +145,7 @@
     const specificity = (e) => {
       const t = e.targets || {};
       if (display && (t.displays || []).includes(display.id)) return 2;
-      if (display && display.group && (t.groups || []).includes(display.group)) return 1;
+      if (groupsOf(display).some((g) => (t.groups || []).includes(g))) return 1;
       return 0;
     };
     const active = (schedules || [])
@@ -181,5 +187,5 @@
       (occursOn(e, date) || (!e.allDay && toMinutes(e.end) <= toMinutes(e.start) && occursOn(e, new Date(date.getTime() - DAY_MS)))));
   }
 
-  return { resolve, isActive, occursOn, appliesToDisplay, hasInterval, contentKey, dayTimeline, intervalsOn, toMinutes, dateKey, weekStart };
+  return { resolve, isActive, occursOn, appliesToDisplay, groupsOf, hasInterval, contentKey, dayTimeline, intervalsOn, toMinutes, dateKey, weekStart };
 });

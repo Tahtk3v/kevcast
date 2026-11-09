@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { resolve, isActive, occursOn, dayTimeline } = require('../shared/schedule');
 
-const display = { id: 'd1', group: 'Lobby', defaultPlaylistId: 'default' };
+const display = { id: 'd1', groups: ['Lobby', 'Floor 1'], defaultPlaylistId: 'default' };
 // 2026-11-09 is a Monday.
 const at = (dateStr, hhmm, ss = '00') => new Date(`${dateStr}T${hhmm}:${ss}`);
 

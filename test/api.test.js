@@ -93,7 +93,7 @@ test('full flow', async () => {
   assert.strictEqual(m.playlists[pl.id].items.length, 1);
 
   // Group commands and bulk settings.
-  await call('PATCH', '/api/displays/bulk', { ids: [d.id], patch: { group: 'Lobby', token: 'hack' } });
+  await call('PATCH', '/api/displays/bulk', { ids: [d.id], patch: { groups: ['Lobby'], token: 'hack' } });
   const cmd = (await call('POST', '/api/displays/command', { group: 'Lobby', action: 'identify' })).body;
   assert.deepStrictEqual([cmd.targeted, cmd.delivered], [1, 0]);
   assert.strictEqual((await call('GET', '/api/player/manifest', null, H)).status, 200, 'bulk patch must not touch the token');
@@ -105,7 +105,33 @@ test('full flow', async () => {
   const good = (await call('POST', '/api/player/register', { provisioning: { key, name: 'Canteen', group: 'Floor 1', playlist: 'Main' } })).body;
   assert.strictEqual(good.approved, true);
   const prov = (await call('GET', '/api/displays')).body.find((x) => x.id === good.id);
-  assert.deepStrictEqual([prov.name, prov.group, prov.defaultPlaylistId], ['Canteen', 'Floor 1', pl.id]);
+  assert.deepStrictEqual([prov.name, prov.groups, prov.defaultPlaylistId], ['Canteen', ['Floor 1'], pl.id]);
+
+  // Display groups: create, add members, schedule the group, copy, rename, bulk-edit, delete.
+  let groups = (await call('GET', '/api/groups')).body;
+  assert.deepStrictEqual(groups.map((g) => g.name).sort(), ['Floor 1', 'Lobby'], 'groups in use exist automatically');
+  const meeting = (await call('POST', '/api/groups', { name: 'Meeting rooms', color: '#16a34a' })).body;
+  assert.strictEqual((await call('POST', '/api/groups', { name: 'meeting ROOMS' })).status, 409);
+  await call('POST', `/api/groups/${meeting.id}/members`, { add: [d.id, good.id] });
+  const both = (await call('GET', '/api/displays')).body.find((x) => x.id === good.id);
+  assert.deepStrictEqual(both.groups, ['Floor 1', 'Meeting rooms'], 'a display can be in several groups');
+  const gs1 = (await call('POST', '/api/schedules', { playlistId: pl.id, allDay: true, targets: { groups: ['Meeting rooms'] } })).body;
+  const empty = (await call('POST', '/api/groups', { name: 'Floor 2' })).body;
+  assert.strictEqual((await call('POST', `/api/groups/${meeting.id}/copy-schedule`, { toGroupIds: [empty.id] })).body.copied, 1);
+  await call('PATCH', `/api/groups/${meeting.id}`, { name: 'Meeting' });
+  assert.deepStrictEqual((await call('GET', '/api/schedules')).body.find((x) => x.id === gs1.id).targets.groups, ['Meeting'], 'rename keeps schedules attached');
+  assert.ok((await call('GET', '/api/displays')).body.find((x) => x.id === good.id).groups.includes('Meeting'));
+  const ids = (await call('GET', '/api/schedules')).body.map((x) => x.id);
+  assert.strictEqual((await call('POST', '/api/schedules/bulk', { ids, action: 'disable' })).body.changed, ids.length);
+  assert.ok((await call('GET', '/api/schedules')).body.every((x) => x.enabled === false));
+  await call('POST', '/api/schedules/bulk', { ids: [gs1.id], action: 'setTargets', targets: { groups: ['Floor 2'] } });
+  assert.deepStrictEqual((await call('GET', '/api/schedules')).body.find((x) => x.id === gs1.id).targets, { displays: [], groups: ['Floor 2'] });
+  // Deleting a group removes entries that only targeted it (they must not become "all displays").
+  const del = (await call('DELETE', `/api/groups/${empty.id}`)).body;
+  assert.strictEqual(del.removedSchedules, 2);
+  assert.strictEqual((await call('GET', '/api/schedules')).body.some((x) => (x.targets.groups || []).includes('Floor 2')), false);
+  groups = (await call('GET', '/api/groups')).body;
+  assert.strictEqual(groups.find((g) => g.name === 'Meeting').members, 2);
 
   // Removing the display invalidates its token.
   await call('DELETE', `/api/displays/${d.id}`);
