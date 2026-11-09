@@ -4,6 +4,7 @@ productName: KevCast Player
 artifactName: KevCast-Player-${version}-${os}-${arch}.${ext}
 directories:
   output: dist/player
+  buildResources: build
 extraMetadata:
   name: kevcast-player
   main: player/main.js
@@ -12,6 +13,7 @@ files:
   - common/**
   - player/**
 win:
+  icon: build/player.ico
   target:
     - target: nsis
       arch: [x64]
@@ -25,11 +27,13 @@ msi:
   perMachine: true
   runAfterFinish: true
 mac:
+  icon: build/player.png
   category: public.app-category.utilities
   target:
     - target: dmg
       arch: [x64, arm64]
 linux:
+  icon: build/player.png
   category: Utility
   target:
     - target: AppImage
