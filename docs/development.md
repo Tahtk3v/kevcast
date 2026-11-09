@@ -68,12 +68,16 @@ Electron major versions arrive as separate pull requests: check the player (offl
 ## Releasing
 1. Update `version` in `package.json` and `desktop/package.json` (`npm version x.y.z --no-git-tag-version` in both folders).
 2. Add a `## [x.y.z] - date` section to `CHANGELOG.md`. It becomes the release notes.
-3. Merge to `main`, then tag that commit and push the tag:
-   ```bash
-   git tag v0.2.1
-   git push origin v0.2.1
-   ```
+3. Merge to `main`, then either:
+   - on GitHub: **Actions → Build → Run workflow**, branch `main`, tick **release**, then **Run workflow**. This creates the `vx.y.z` tag itself, or
+   - tag the merge commit and push the tag:
+     ```bash
+     git tag v0.2.1
+     git push origin v0.2.1
+     ```
 4. The *Build* workflow:
    - builds every installer on Windows, macOS and Linux
-   - checks that the tag matches `package.json`
-   - publishes the **GitHub Release** with all installers attached
+   - checks the version
+   - publishes the **GitHub Release** with all installers attached and the changelog section as notes
+
+   It refuses to publish a version that already has a release, so bump the version first.
