@@ -343,7 +343,7 @@
         h('div', { class: 'card' },
           h('div', { class: 'section-head' }, h('h2', {}, 'Screens'), h('div', { class: 'spacer' }), h('a', { class: 'btn sm', href: '#/displays' }, 'Manage')),
           displays.length ? displays.map((d) => {
-            const pl = byId(state.playlists, d.scheduledPlaylistId);
+            const pl = d.scheduledMediaId || d.scheduledPlaylistId ? contentInfo(d.scheduledMediaId ? `media:${d.scheduledMediaId}` : d.scheduledPlaylistId) : null;
             return h('div', { class: 'list-row' },
               h('span', { class: `dot ${d.online ? 'on' : ''}` }),
               h('div', { style: { minWidth: 0 } }, h('b', {}, d.name), h('div', { class: 'muted small' }, d.online ? (d.nowPlaying ? `Showing: ${d.nowPlaying.name}${d.nowPlaying.slides ? ` (slide ${d.nowPlaying.slide}/${d.nowPlaying.slides})` : ''}` : 'Online') : `Offline · last seen ${ago(d.lastSeen)}`)),
@@ -476,7 +476,7 @@
     if (m.type === 'image') preview = h('img', { src: m.url });
     else if (m.type === 'video') preview = h('video', { src: m.url, controls: true, muted: true });
     else if (m.type === 'presentation' && m.slideUrls) preview = h('img', { src: m.slideUrls[0] });
-    else if (m.type === 'web') preview = h('iframe', { src: m.url, sandbox: 'allow-scripts allow-same-origin' });
+    else if (m.type === 'web') preview = h('iframe', { src: m.url, sandbox: 'allow-scripts allow-same-origin', referrerpolicy: 'no-referrer' });
     else if (m.type === 'text') preview = textPreview(m.text);
     const big = h('div', { class: 'preview-big' }, preview || (m.status === 'processing' ? h('div', { class: 'spinner' }) : icon('media')));
     const usedIn = state.playlists.filter((p) => p.items.some((i) => i.mediaId === m.id));
@@ -500,6 +500,8 @@
         } }, icon('trash'), 'Delete'),
         m.type === 'presentation' ? h('button', { class: 'btn', onclick: async () => { await api(`/media/${m.id}/reconvert`, { method: 'POST' }); close(); toast('Converting again…'); } }, icon('refresh'), 'Re-convert') : null,
         m.type === 'text' ? h('button', { class: 'btn', onclick: () => { close(); textDialog(m); } }, 'Edit text') : null,
+        m.type === 'web' ? h('button', { class: 'btn', onclick: () => { close(); webDialog(m); } }, 'Edit web page') : null,
+        h('button', { class: 'btn', title: 'Schedule this item on its own', onclick: () => { close(); scheduleDialog({ mediaId: m.id }); } }, icon('schedule'), 'Schedule'),
         addToPlaylistControl(m),
         h('div', { class: 'spacer' }),
         h('button', { class: 'btn primary', onclick: async () => {
@@ -510,23 +512,46 @@
     });
   }
 
-  function webDialog() {
-    const url = h('input', { placeholder: 'https://example.com/dashboard' });
-    const name = h('input', { placeholder: 'Optional' });
+  /** Add or edit a web page (departure board, traffic info, dashboard…). */
+  function webDialog(existing) {
+    const url = h('input', { placeholder: 'https://example.org/departures', value: existing?.url || '' });
+    const name = h('input', { placeholder: 'e.g. Train departures', value: existing?.name || '' });
+    let zoom = Number(existing?.zoom) || 100;
+    let refresh = Number(existing?.refreshSeconds) || 0;
     const err = h('div', { class: 'err-text' });
+    const save = async (thenSchedule, close) => {
+      err.textContent = '';
+      try {
+        let u = url.value.trim();
+        if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u;
+        const body = { url: u, name: name.value.trim() || u, zoom, refreshSeconds: refresh };
+        const m = existing
+          ? await api(`/media/${existing.id}`, { method: 'PATCH', body })
+          : await api('/media', { method: 'POST', body: { type: 'web', ...body } });
+        close(); await loadAll(); renderPage(); toast(existing ? 'Saved' : 'Web page added', 'ok');
+        if (thenSchedule) scheduleDialog({ mediaId: m.id });
+      } catch (e) { err.textContent = e.message; }
+    };
     modal({
-      title: 'Add a web page',
-      body: [h('p', { class: 'muted' }, 'Show a live website, dashboard or Power BI report. Note: some sites block being shown inside other pages.'),
-        h('label', { class: 'field' }, 'Web address', url), h('label', { class: 'field' }, 'Name', name), err],
+      title: existing ? 'Edit web page' : 'Add a web page',
+      body: [
+        h('p', { class: 'muted', style: { margin: 0 } }, 'Show a live website: train departures, traffic info, weather, a dashboard or a Power BI report. ',
+          'Screens running the KevCast Player app can also show sites that normally refuse to be embedded; in a plain browser some sites stay blank.'),
+        h('label', { class: 'field' }, 'Web address', url),
+        h('label', { class: 'field' }, 'Name', name),
+        h('div', { class: 'grid2' },
+          h('div', { class: 'field' }, h('b', { class: 'small' }, 'Zoom'), h('span', { class: 'hint' }, 'Below 100% fits more of a desktop page on the screen'),
+            segmented([[67, '67%'], [80, '80%'], [100, '100%'], [125, '125%'], [150, '150%']], zoom, (v) => (zoom = v))),
+          h('div', { class: 'field' }, h('b', { class: 'small' }, 'Reload the page'), h('span', { class: 'hint' }, 'For pages that do not update by themselves'),
+            h('select', { onchange: (e) => (refresh = Number(e.target.value)) },
+              [[0, 'Never (the page updates itself)'], [60, 'Every minute'], [300, 'Every 5 minutes'], [900, 'Every 15 minutes'], [3600, 'Every hour']]
+                .map(([v, l]) => h('option', { value: v, selected: v === refresh }, l))))),
+        existing ? h('a', { class: 'btn sm', href: `/player/?preview=media:${existing.id}`, target: '_blank', style: { alignSelf: 'flex-start' } }, icon('play'), 'Preview on a screen') : null,
+        err,
+      ],
       footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, 'Cancel'),
-        h('button', { class: 'btn primary', onclick: async () => {
-          try {
-            let u = url.value.trim();
-            if (u && !/^https?:\/\//i.test(u)) u = 'https://' + u;
-            await api('/media', { method: 'POST', body: { type: 'web', url: u, name: name.value.trim() } });
-            close(); await loadAll(); renderPage(); toast('Web page added', 'ok');
-          } catch (e) { err.textContent = e.message; }
-        } }, 'Add')],
+        h('button', { class: 'btn', onclick: () => save(true, close) }, icon('schedule'), existing ? 'Save & schedule' : 'Add & schedule'),
+        h('button', { class: 'btn primary', onclick: () => save(false, close) }, existing ? 'Save' : 'Add')],
     });
   }
 
@@ -732,53 +757,117 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Schedule — week calendar
+  // Schedule — calendar + week overview
   // ---------------------------------------------------------------------------
   const HOUR_PX = 44;
   const dkey = KevSchedule.dateKey;
   const pad = (n) => String(n).padStart(2, '0');
   const minToHHMM = (m) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`;
+  const TYPE_COLOR = { web: '#0d9488', image: '#2563eb', video: '#9333ea', presentation: '#b45309', text: '#db2777' };
+  const ordinal = (n) => `${n}${[11, 12, 13].includes(n % 100) ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th'}`;
 
   function weekStart(offset) {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    const dow = (d.getDay() + 6) % 7; // Monday first
-    d.setDate(d.getDate() - dow + offset * 7);
+    const d = KevSchedule.weekStart(new Date());
+    d.setDate(d.getDate() + offset * 7);
     return d;
   }
 
+  /** Name and colour of what a schedule entry (or a resolved key) plays. */
+  function contentInfo(sOrKey) {
+    const key = typeof sOrKey === 'string' || sOrKey === null ? sOrKey : KevSchedule.contentKey(sOrKey);
+    if (!key) return { name: 'Clock screen', color: '#94a3b8', kind: 'idle' };
+    if (key.startsWith('media:')) {
+      const m = byId(state.media, key.slice(6));
+      return { name: m ? m.name : '(deleted item)', color: TYPE_COLOR[m?.type] || '#64748b', kind: m?.type === 'web' ? 'Web page' : TYPE_LABEL[m?.type] || 'Item' };
+    }
+    const p = byId(state.playlists, key);
+    return { name: p ? p.name : '(deleted playlist)', color: p?.color || '#64748b', kind: 'Playlist' };
+  }
+
+  /** [startMin, endMin] segments of entry s on this calendar date. */
   function entryOnDate(s, date) {
-    // Returns [startMin, endMin] segments of entry s on this calendar date.
     const segs = [];
-    const okDay = (d) => {
-      const days = s.days && s.days.length ? s.days : [0, 1, 2, 3, 4, 5, 6];
-      const k = dkey(d);
-      return days.includes(d.getDay()) && (!s.startDate || k >= s.startDate) && (!s.endDate || k <= s.endDate);
-    };
-    if (s.allDay) { if (okDay(date)) segs.push([0, 1440]); return segs; }
+    if (s.allDay) { if (KevSchedule.occursOn(s, date)) segs.push([0, 1440]); return segs; }
     const st = KevSchedule.toMinutes(s.start);
     const en = KevSchedule.toMinutes(s.end);
-    if (en > st) { if (okDay(date)) segs.push([st, en]); return segs; }
+    if (en > st) { if (KevSchedule.occursOn(s, date)) segs.push([st, en]); return segs; }
     const prev = new Date(date); prev.setDate(prev.getDate() - 1);
-    if (okDay(prev) && en > 0) segs.push([0, en]);
-    if (okDay(date)) segs.push([st, 1440]);
+    if (KevSchedule.occursOn(s, prev) && en > 0) segs.push([0, en]);
+    if (KevSchedule.occursOn(s, date)) segs.push([st, 1440]);
     return segs;
+  }
+
+  function describeTargets(s) {
+    const t = s.targets || {};
+    const parts = [...(t.displays || []).map((id) => byId(state.displays, id)?.name).filter(Boolean), ...(t.groups || []).map((g) => `Group: ${g}`)];
+    return parts.length ? parts.join(', ') : 'All displays';
+  }
+  function describeDays(s) {
+    const d = (s.days && s.days.length ? s.days : [0, 1, 2, 3, 4, 5, 6]).slice().sort();
+    if (d.length === 7) return 'Every day';
+    if (d.join() === '1,2,3,4,5') return 'Weekdays';
+    if (d.join() === '0,6') return 'Weekends';
+    return d.map((x) => DAYS[x]).join(', ');
+  }
+  function describeInterval(s) {
+    return KevSchedule.hasInterval(s) ? `every ${s.interval.everyMinutes} min for ${s.interval.showSeconds} s` : '';
+  }
+  /** "Weekdays, 08:00–17:00 · every 15 min for 60 s" */
+  function describeWhen(s) {
+    const repeat = s.repeat || 'weekly';
+    let when;
+    if (repeat === 'once') when = `Once on ${s.startDate ? new Date(s.startDate + 'T12:00').toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '?'}`;
+    else if (repeat === 'monthly') when = `Every month on the ${ordinal(Number(s.monthDay) || 1)}`;
+    else when = describeDays(s) + (Number(s.everyWeeks) > 1 ? `, every ${s.everyWeeks} weeks` : '');
+    const time = s.allDay ? 'all day' : `${s.start}–${s.end}`;
+    return [when + ', ' + time, describeInterval(s)].filter(Boolean).join(' · ');
+  }
+  function describePeriod(s) {
+    if ((s.repeat || 'weekly') === 'once' || (!s.startDate && !s.endDate)) return '';
+    const f = (k) => new Date(k + 'T12:00').toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+    if (s.startDate && s.endDate) return `Valid ${f(s.startDate)} – ${f(s.endDate)}`;
+    return s.startDate ? `Valid from ${f(s.startDate)}` : `Valid until ${f(s.endDate)}`;
   }
 
   function SchedulePage() {
     const start = weekStart(state.calWeekOffset);
     const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
-    const today = dkey(new Date());
+    const approved = state.displays.filter((d) => d.approved);
     const filterDisplay = byId(state.displays, state.calDisplay);
     const relevant = state.schedules.filter((s) => !filterDisplay || KevSchedule.appliesToDisplay(s, filterDisplay));
-    const approved = state.displays.filter((d) => d.approved);
+    const view = state.calView || 'calendar';
 
     const displaySel = h('select', { style: { width: 'auto' }, onchange: (e) => { state.calDisplay = e.target.value; renderPage(); } },
       h('option', { value: '' }, 'All displays'), approved.map((d) => h('option', { value: d.id, selected: d.id === state.calDisplay }, d.name)));
+    const viewSel = segmented([['calendar', 'Calendar'], ['week', 'Week overview']], view, (v) => { state.calView = v; renderPage(); });
 
+    const used = [...new Set(relevant.map((s) => KevSchedule.contentKey(s)))].map((k) => ({ k, ...contentInfo(k) }));
+    const fallback = filterDisplay ? byId(state.playlists, filterDisplay.defaultPlaylistId) : null;
+
+    return [
+      pageHead('Schedule', view === 'week'
+        ? 'What every screen plays, day by day. Click a bar to change it.'
+        : 'Click and drag on the calendar to schedule something. Click a block to edit it.',
+        viewSel, displaySel,
+        h('button', { class: 'btn primary', onclick: () => scheduleDialog({ targets: { displays: filterDisplay ? [filterDisplay.id] : [], groups: [] } }) }, icon('plus'), 'Add to schedule')),
+      h('div', { class: 'row', style: { marginBottom: '12px' } },
+        h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset--; renderPage(); } }, icon('left')),
+        h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset = 0; renderPage(); } }, 'This week'),
+        h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset++; renderPage(); } }, icon('right')),
+        h('b', { style: { marginLeft: '8px' } }, `${days[0].toLocaleDateString([], { day: 'numeric', month: 'long' })} – ${days[6].toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}`)),
+      view === 'week' ? weekOverview(days, filterDisplay || approved[0] || null, !filterDisplay && approved.length > 0) : calendarView(days, relevant, filterDisplay),
+      h('div', { class: 'legend' },
+        used.map((u) => h('span', {}, h('span', { class: 'swatch', style: { background: u.color } }), u.name, h('span', { class: 'muted small' }, ` (${u.kind})`))),
+        filterDisplay ? h('span', { class: 'muted' }, `Outside scheduled times “${filterDisplay.name}” shows: `, fallback ? h('b', {}, fallback.name) : 'the clock screen', ' (change under Displays)') :
+          h('span', { class: 'muted' }, 'Outside scheduled times each display shows its default playlist.')),
+      scheduleTable(relevant),
+    ];
+  }
+
+  function calendarView(days, relevant, filterDisplay) {
+    const today = dkey(new Date());
     const head = h('div', { class: 'cal-head' }, h('div'), days.map((d) =>
       h('div', { class: dkey(d) === today ? 'today' : '' }, DAYS[d.getDay()], h('small', {}, d.toLocaleDateString([], { day: 'numeric', month: 'short' })))));
-
     const body = h('div', { class: 'cal-body' });
     body.append(h('div', { class: 'cal-hours' }, Array.from({ length: 24 }, (_, i) => h('div', {}, i ? `${pad(i)}:00` : ''))));
     days.forEach((d) => {
@@ -786,26 +875,41 @@
       // Lay out overlapping blocks side-by-side.
       const blocks = [];
       relevant.forEach((s) => entryOnDate(s, d).forEach(([a, b]) => blocks.push({ s, a, b })));
-      blocks.sort((x, y) => (y.s.priority || 0) - (x.s.priority || 0) || x.a - y.a);
-      const lanes = [];
+      // Overlapping blocks share the width of their own cluster only.
+      blocks.sort((x, y) => x.a - y.a || y.b - x.b);
+      let cluster = [];
+      let clusterEnd = -1;
+      const flush = () => {
+        const lanes = [];
+        cluster.forEach((bk) => {
+          let lane = lanes.findIndex((l) => l.every((o) => o.b <= bk.a || o.a >= bk.b));
+          if (lane === -1) { lanes.push([]); lane = lanes.length - 1; }
+          lanes[lane].push(bk);
+          bk.lane = lane;
+        });
+        cluster.forEach((bk) => (bk.lanes = lanes.length));
+        cluster = [];
+      };
       blocks.forEach((bk) => {
-        let lane = lanes.findIndex((l) => l.every((o) => o.b <= bk.a || o.a >= bk.b));
-        if (lane === -1) { lanes.push([]); lane = lanes.length - 1; }
-        lanes[lane].push(bk);
-        bk.lane = lane;
+        if (cluster.length && bk.a >= clusterEnd) flush();
+        cluster.push(bk);
+        clusterEnd = Math.max(clusterEnd, bk.b);
       });
+      flush();
       blocks.forEach((bk) => {
-        const p = byId(state.playlists, bk.s.playlistId);
-        const w = 100 / Math.max(1, lanes.length);
-        const el = h('div', {
-          class: `cal-block ${bk.s.enabled === false ? 'off' : ''}`,
-          title: `${p?.name || '?'} · ${bk.s.allDay ? 'All day' : `${bk.s.start}–${bk.s.end}`}`,
-          style: { top: `${(bk.a / 60) * HOUR_PX}px`, height: `${Math.max(18, ((bk.b - bk.a) / 60) * HOUR_PX - 2)}px`, background: p?.color || '#64748b',
+        const c = contentInfo(bk.s);
+        const w = 100 / Math.max(1, bk.lanes);
+        const recurring = KevSchedule.hasInterval(bk.s);
+        col.append(h('div', {
+          class: `cal-block ${bk.s.enabled === false ? 'off' : ''} ${recurring ? 'recurring' : ''}`,
+          title: `${c.name} (${c.kind}) · ${describeWhen(bk.s)}`,
+          style: { top: `${(bk.a / 60) * HOUR_PX}px`, height: `${Math.max(18, ((bk.b - bk.a) / 60) * HOUR_PX - 2)}px`, background: c.color,
             left: `calc(${bk.lane * w}% + 3px)`, width: `calc(${w}% - 6px)`, right: 'auto' },
           onmousedown: (e) => e.stopPropagation(),
           onclick: (e) => { e.stopPropagation(); scheduleDialog(bk.s); },
-        }, h('b', {}, bk.s.name || p?.name || 'Playlist'), h('span', {}, bk.s.allDay ? 'All day' : `${bk.s.start}–${bk.s.end}`), bk.s.priority >= 5 ? h('span', {}, ' · ⚑') : null);
-        col.append(el);
+        }, h('b', {}, (recurring ? '↻ ' : '') + (bk.s.name || c.name)),
+        h('span', {}, recurring ? describeInterval(bk.s) : bk.s.allDay ? 'All day' : `${bk.s.start}–${bk.s.end}`),
+        bk.s.priority >= 5 ? h('span', {}, ' · ⚑') : null));
       });
       if (dkey(d) === today) {
         const now = new Date();
@@ -837,55 +941,64 @@
       });
       body.append(col);
     });
-
     const scroll = h('div', { class: 'cal-scroll' }, body);
     setTimeout(() => { if (!scroll.dataset.done) { scroll.scrollTop = 7 * HOUR_PX; scroll.dataset.done = 1; } });
-
-    const usedPlaylists = [...new Set(relevant.map((s) => s.playlistId))].map((id) => byId(state.playlists, id)).filter(Boolean);
-    const fallback = filterDisplay ? byId(state.playlists, filterDisplay.defaultPlaylistId) : null;
-
-    return [
-      pageHead('Schedule', 'Click and drag on the calendar to schedule a playlist. Click a block to edit it.',
-        displaySel,
-        h('button', { class: 'btn primary', onclick: () => scheduleDialog({ targets: { displays: filterDisplay ? [filterDisplay.id] : [], groups: [] } }) }, icon('plus'), 'Add to schedule')),
-      h('div', { class: 'row', style: { marginBottom: '12px' } },
-        h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset--; renderPage(); } }, icon('left')),
-        h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset = 0; renderPage(); } }, 'This week'),
-        h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset++; renderPage(); } }, icon('right')),
-        h('b', { style: { marginLeft: '8px' } }, `${days[0].toLocaleDateString([], { day: 'numeric', month: 'long' })} – ${days[6].toLocaleDateString([], { day: 'numeric', month: 'long', year: 'numeric' })}`)),
-      h('div', { class: 'card cal' }, head, scroll),
-      h('div', { class: 'legend' },
-        usedPlaylists.map((p) => h('span', {}, h('span', { class: 'swatch', style: { background: p.color } }), p.name)),
-        filterDisplay ? h('span', { class: 'muted' }, `Outside scheduled times “${filterDisplay.name}” shows: `, fallback ? h('b', {}, fallback.name) : 'the idle clock screen', ' (change under Displays)') :
-          h('span', { class: 'muted' }, 'Outside scheduled times each display shows its default playlist.')),
-      scheduleTable(relevant),
-    ];
+    return h('div', { class: 'card cal' }, head, scroll);
   }
 
-  function describeTargets(s) {
-    const t = s.targets || {};
-    const parts = [...(t.displays || []).map((id) => byId(state.displays, id)?.name).filter(Boolean), ...(t.groups || []).map((g) => `Group: ${g}`)];
-    return parts.length ? parts.join(', ') : 'All displays';
-  }
-  function describeDays(s) {
-    const d = (s.days && s.days.length ? s.days : [0, 1, 2, 3, 4, 5, 6]).slice().sort();
-    if (d.length === 7) return 'Every day';
-    if (d.join() === '1,2,3,4,5') return 'Weekdays';
-    if (d.join() === '0,6') return 'Weekends';
-    return d.map((x) => DAYS[x]).join(', ');
+  /** One row per day showing exactly what a display plays (schedule + default + recurring items). */
+  function weekOverview(days, display, picked) {
+    const today = dkey(new Date());
+    const target = display || { id: '__none', group: '', defaultPlaylistId: null };
+    const ticks = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+    const pct = (m) => `${(m / 1440) * 100}%`;
+    const rows = days.map((d) => {
+      const segs = KevSchedule.dayTimeline(state.schedules, target, d, 5);
+      const recurring = KevSchedule.intervalsOn(state.schedules, target, d);
+      const track = h('div', { class: 'wk-track', title: 'Click to schedule something on this day', onclick: () => scheduleDialog({ days: [d.getDay()], targets: { displays: display ? [display.id] : [], groups: [] } }) });
+      segs.forEach((sg) => {
+        const c = contentInfo(sg.key);
+        const s = sg.scheduleId ? byId(state.schedules, sg.scheduleId) : null;
+        track.append(h('div', {
+          class: `wk-seg ${sg.scheduleId ? '' : 'default'} ${sg.key ? '' : 'idle'}`,
+          style: { left: pct(sg.from), width: pct(sg.to - sg.from), background: c.color },
+          title: `${minToHHMM(sg.from)}–${sg.to >= 1440 ? '24:00' : minToHHMM(sg.to)}  ${c.name}${sg.scheduleId ? '' : sg.key ? ' (default playlist)' : ''}`,
+          onclick: (e) => { e.stopPropagation(); if (s) scheduleDialog(s); else if (display) displayDialog(display); },
+        }, sg.to - sg.from >= 90 ? h('span', {}, (sg.scheduleId ? '' : '◦ ') + (s?.name || c.name)) : null));
+      });
+      if (dkey(d) === today) {
+        const now = new Date();
+        track.append(h('div', { class: 'wk-now', style: { left: pct(now.getHours() * 60 + now.getMinutes()) } }));
+      }
+      return h('div', { class: `wk-row ${dkey(d) === today ? 'today' : ''}` },
+        h('div', { class: 'wk-day' }, h('b', {}, DAYS[d.getDay()]), h('small', {}, d.toLocaleDateString([], { day: 'numeric', month: 'short' }))),
+        h('div', {}, track,
+          recurring.length ? h('div', { class: 'wk-recurring' }, recurring.map((s) => {
+            const c = contentInfo(s);
+            return h('button', { class: 'chip', style: { borderColor: c.color }, onclick: () => scheduleDialog(s) },
+              h('span', { class: 'swatch', style: { background: c.color, display: 'inline-block', marginRight: '6px' } }),
+              `↻ ${s.name || c.name}: ${describeInterval(s)}, ${s.allDay ? 'all day' : `${s.start}–${s.end}`}`);
+          })) : null));
+    });
+    return h('div', { class: 'card wk' },
+      h('div', { class: 'wk-head' }, h('div', { class: 'muted small' }, display ? (picked ? `Showing: ${display.name}` : display.name) : 'No displays yet'),
+        h('div', { class: 'wk-ticks' }, ticks.map((t) => h('span', { style: { left: pct(t * 60) } }, `${pad(t)}:00`)))),
+      rows,
+      h('div', { class: 'wk-foot muted small' }, '◦ = default playlist of the screen · ↻ = shown repeatedly within its time window, on top of the content above'));
   }
 
   function scheduleTable(list) {
     if (!list.length) return h('div', { class: 'card empty', style: { marginTop: '16px' } }, h('h3', {}, 'Nothing scheduled yet'), h('p', {}, 'Drag on the calendar above, or set a default playlist for each display.'));
     return h('div', { class: 'card', style: { marginTop: '16px', overflowX: 'auto' } },
       h('table', { class: 'tbl' },
-        h('thead', {}, h('tr', {}, ['', 'Playlist', 'When', 'Screens', 'Priority', 'On'].map((x) => h('th', {}, x)))),
+        h('thead', {}, h('tr', {}, ['', 'Content', 'When', 'Screens', 'Priority', 'On'].map((x) => h('th', {}, x)))),
         h('tbody', {}, list.map((s) => {
-          const p = byId(state.playlists, s.playlistId);
+          const c = contentInfo(s);
           return h('tr', { class: 'click', onclick: () => scheduleDialog(s) },
-            h('td', { style: { width: '20px' } }, h('span', { class: 'swatch', style: { background: p?.color } })),
-            h('td', {}, h('b', {}, s.name || p?.name || '?'), s.name ? h('div', { class: 'muted small' }, p?.name) : null),
-            h('td', {}, `${describeDays(s)}, ${s.allDay ? 'all day' : `${s.start}–${s.end}`}`, s.startDate || s.endDate ? h('div', { class: 'muted small' }, `${s.startDate || '…'} → ${s.endDate || '…'}`) : null),
+            h('td', { style: { width: '20px' } }, h('span', { class: 'swatch', style: { background: c.color } })),
+            h('td', {}, h('b', {}, s.name || c.name), h('div', { class: 'muted small' }, s.name ? `${c.name} · ${c.kind}` : c.kind,
+              s.itemDuration ? ` · ${s.itemDuration} s per item` : '')),
+            h('td', {}, describeWhen(s), describePeriod(s) ? h('div', { class: 'muted small' }, describePeriod(s)) : null),
             h('td', {}, describeTargets(s)),
             h('td', {}, s.priority >= 10 ? h('span', { class: 'badge err' }, 'Urgent') : s.priority >= 5 ? h('span', { class: 'badge warn' }, 'High') : h('span', { class: 'muted' }, 'Normal')),
             h('td', { onclick: (e) => e.stopPropagation() }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: async (e) => { await api(`/schedules/${s.id}`, { method: 'PUT', body: { ...s, enabled: e.target.checked } }); } })));
@@ -893,22 +1006,85 @@
   }
 
   function scheduleDialog(initial = {}) {
-    if (!state.playlists.length) {
-      toast('Create a playlist first, then schedule it.', 'err');
-      return go('#/playlists');
-    }
-    const s = JSON.parse(JSON.stringify(Object.assign({ name: '', playlistId: state.playlists[0].id, days: [1, 2, 3, 4, 5], start: '08:00', end: '17:00', allDay: false, priority: 0, enabled: true, targets: { displays: [], groups: [] }, startDate: null, endDate: null }, initial)));
+    const s = JSON.parse(JSON.stringify(Object.assign({
+      name: '', playlistId: state.playlists[0]?.id || null, mediaId: null, itemDuration: 0,
+      repeat: 'weekly', days: [1, 2, 3, 4, 5], everyWeeks: 1, monthDay: new Date().getDate(),
+      start: '08:00', end: '17:00', allDay: false, priority: 0, enabled: true,
+      targets: { displays: [], groups: [] }, startDate: null, endDate: null, interval: null,
+    }, initial)));
     s.targets = s.targets || { displays: [], groups: [] };
+    const webPages = state.media.filter((m) => m.type === 'web');
+    const mediaNow = s.mediaId ? byId(state.media, s.mediaId) : null;
+    let what = s.mediaId ? (mediaNow?.type === 'web' ? 'web' : 'media') : (initial.what || 'playlist');
+    if (what === 'playlist' && !state.playlists.length) what = webPages.length || !state.media.length ? 'web' : 'media';
     const err = h('div', { class: 'err-text' });
 
-    const plSel = h('select', { onchange: () => { s.playlistId = plSel.value; } }, state.playlists.map((p) => h('option', { value: p.id, selected: p.id === s.playlistId }, p.name)));
+    // --- What should play? ------------------------------------------------------
+    const newWeb = { url: '', name: '', zoom: 100, refreshSeconds: 0 };
+    let webChoice = s.mediaId && mediaNow?.type === 'web' ? s.mediaId : webPages[0]?.id || '__new';
+    const whatBox = h('div', { class: 'stack', style: { gap: '8px' } });
+    const drawWhat = () => {
+      if (what === 'playlist') {
+        whatBox.replaceChildren(state.playlists.length
+          ? h('select', { onchange: (e) => (s.playlistId = e.target.value) }, state.playlists.map((p) => h('option', { value: p.id, selected: p.id === s.playlistId }, p.name)))
+          : h('div', { class: 'hint' }, 'No playlists yet. ', h('a', { href: '#/playlists' }, 'Create one'), ', or schedule a web page or single item.'));
+      } else if (what === 'media') {
+        const items = state.media.filter((m) => m.type !== 'web');
+        if (!s.mediaId || byId(state.media, s.mediaId)?.type === 'web') s.mediaId = items[0]?.id || null;
+        whatBox.replaceChildren(items.length
+          ? h('select', { onchange: (e) => (s.mediaId = e.target.value) }, items.map((m) => h('option', { value: m.id, selected: m.id === s.mediaId }, `${m.name} (${TYPE_LABEL[m.type]})`)))
+          : h('div', { class: 'hint' }, 'No media yet. ', h('a', { href: '#/media' }, 'Upload some'), '.'));
+      } else {
+        const urlI = h('input', { value: newWeb.url, placeholder: 'https://example.org/departures', oninput: (e) => (newWeb.url = e.target.value) });
+        const nameI = h('input', { value: newWeb.name, placeholder: 'e.g. Train departures', oninput: (e) => (newWeb.name = e.target.value) });
+        const newBox = h('div', { class: 'stack', style: { gap: '8px' } },
+          h('div', { class: 'grid2' }, h('label', { class: 'field' }, 'Web address', urlI), h('label', { class: 'field' }, 'Name', nameI)),
+          h('div', { class: 'row wrap', style: { gap: '16px' } },
+            h('label', { class: 'row small' }, 'Zoom', h('select', { style: { width: 'auto' }, onchange: (e) => (newWeb.zoom = Number(e.target.value)) },
+              [50, 67, 75, 90, 100, 125, 150, 200].map((z) => h('option', { value: z, selected: z === newWeb.zoom }, `${z}%`)))),
+            h('label', { class: 'row small' }, 'Reload every', h('select', { style: { width: 'auto' }, onchange: (e) => (newWeb.refreshSeconds = Number(e.target.value)) },
+              [[0, 'never'], [60, 'minute'], [300, '5 minutes'], [900, '15 minutes'], [3600, 'hour']].map(([v, l]) => h('option', { value: v, selected: v === newWeb.refreshSeconds }, l))))),
+          h('span', { class: 'hint' }, 'Departure boards, traffic info, dashboards… The KevCast Player app also shows sites that normally refuse to be embedded.'));
+        newBox.hidden = webChoice !== '__new';
+        whatBox.replaceChildren(
+          h('select', { onchange: (e) => { webChoice = e.target.value; newBox.hidden = webChoice !== '__new'; if (webChoice !== '__new') s.mediaId = webChoice; } },
+            webPages.map((m) => h('option', { value: m.id, selected: m.id === webChoice }, `${m.name} — ${m.url}`)),
+            h('option', { value: '__new', selected: webChoice === '__new' }, '+ New web page…')),
+          newBox);
+        if (webChoice !== '__new') s.mediaId = webChoice;
+      }
+    };
+    drawWhat();
+    const durI = h('input', { type: 'number', min: 0, value: s.itemDuration || '', placeholder: 'default', style: { width: '110px' }, oninput: (e) => (s.itemDuration = Number(e.target.value) || 0) });
 
+    // --- When? ------------------------------------------------------------------------
     const dayBox = h('div', { class: 'day-pick' });
     const drawDays = () => dayBox.replaceChildren(...[1, 2, 3, 4, 5, 6, 0].map((d) => h('button', { type: 'button', class: s.days.includes(d) ? 'on' : '', onclick: () => {
       s.days = s.days.includes(d) ? s.days.filter((x) => x !== d) : [...s.days, d]; drawDays();
     } }, DAYS[d])));
     drawDays();
     const quick = (label, days) => h('button', { type: 'button', class: 'btn sm ghost', onclick: () => { s.days = days; drawDays(); } }, label);
+    const weeklyBox = h('div', { class: 'stack', style: { gap: '8px' } }, dayBox,
+      h('div', { class: 'row wrap' }, quick('Weekdays', [1, 2, 3, 4, 5]), quick('Weekend', [0, 6]), quick('Every day', [0, 1, 2, 3, 4, 5, 6]),
+        h('div', { class: 'spacer' }),
+        h('label', { class: 'row small' }, 'Repeat', h('select', { style: { width: 'auto' }, onchange: (e) => (s.everyWeeks = Number(e.target.value)) },
+          [[1, 'every week'], [2, 'every 2 weeks'], [3, 'every 3 weeks'], [4, 'every 4 weeks']].map(([v, l]) => h('option', { value: v, selected: v === (Number(s.everyWeeks) || 1) }, l))))));
+    const monthlyBox = h('label', { class: 'row small' }, 'On day', h('select', { style: { width: 'auto' }, onchange: (e) => (s.monthDay = Number(e.target.value)) },
+      Array.from({ length: 31 }, (_, i) => i + 1).map((n) => h('option', { value: n, selected: n === Number(s.monthDay) }, ordinal(n)))), 'of every month');
+    const onceDate = h('input', { type: 'date', value: s.startDate || dkey(new Date()), style: { width: 'auto' }, oninput: (e) => (s.startDate = e.target.value || null) });
+    const onceBox = h('label', { class: 'row small' }, 'On', onceDate);
+    const from = h('input', { type: 'date', value: s.startDate || '', oninput: () => (s.startDate = from.value || null) });
+    const until = h('input', { type: 'date', value: s.endDate || '', oninput: () => (s.endDate = until.value || null) });
+    const periodBox = h('div', { class: 'grid2' },
+      h('label', { class: 'field' }, 'Valid from', h('span', { class: 'hint' }, 'Empty = starting now'), from),
+      h('label', { class: 'field' }, 'Valid until', h('span', { class: 'hint' }, 'Empty = no end date'), until));
+    const drawRepeat = () => {
+      weeklyBox.hidden = s.repeat !== 'weekly';
+      monthlyBox.hidden = s.repeat !== 'monthly';
+      onceBox.hidden = s.repeat !== 'once';
+      periodBox.hidden = s.repeat === 'once';
+    };
+    drawRepeat();
 
     const startI = h('input', { type: 'time', value: s.start, oninput: () => (s.start = startI.value) });
     const endI = h('input', { type: 'time', value: s.end, oninput: () => (s.end = endI.value) });
@@ -916,42 +1092,77 @@
     timeRow.hidden = s.allDay;
     const allDay = h('input', { type: 'checkbox', checked: s.allDay, onchange: () => { s.allDay = allDay.checked; timeRow.hidden = s.allDay; } });
 
-    const approved = state.displays.filter((d) => d.approved);
-    const targetBox = targetChips(s.targets);
+    // Recurring within the window ("traffic info every 15 minutes for 1 minute").
+    const iv = s.interval || { everyMinutes: 15, showSeconds: 60 };
+    const ivOn = h('input', { type: 'checkbox', checked: !!s.interval });
+    const ivEvery = h('input', { type: 'number', min: 1, value: iv.everyMinutes, style: { width: '80px' } });
+    const ivShow = h('input', { type: 'number', min: 5, value: iv.showSeconds, style: { width: '90px' } });
+    const ivBox = h('div', { class: 'row wrap small', style: { gap: '8px', marginLeft: '26px' } }, 'Every', ivEvery, 'minutes, show it for', ivShow, 'seconds, then return to the normal content.');
+    ivBox.hidden = !s.interval;
+    ivOn.onchange = () => { ivBox.hidden = !ivOn.checked; };
 
-    const from = h('input', { type: 'date', value: s.startDate || '', oninput: () => (s.startDate = from.value || null) });
-    const until = h('input', { type: 'date', value: s.endDate || '', oninput: () => (s.endDate = until.value || null) });
     const name = h('input', { value: s.name, placeholder: 'e.g. Lunch menu (optional)', oninput: () => (s.name = name.value) });
+    const approved = state.displays.filter((d) => d.approved);
 
     modal({
-      title: s.id ? 'Edit scheduled content' : 'Schedule a playlist',
+      title: s.id ? 'Edit scheduled content' : 'Add to schedule',
+      wide: true,
       body: [
-        h('label', { class: 'field' }, 'What should play?', plSel),
-        h('div', { class: 'field' }, h('b', { class: 'small' }, 'Which screens?'), targetBox, approved.length ? null : h('span', { class: 'hint' }, 'No displays connected yet — “All displays” will include them once added.')),
-        h('div', { class: 'field' }, h('b', { class: 'small' }, 'On which days?'), dayBox, h('div', { class: 'row' }, quick('Weekdays', [1, 2, 3, 4, 5]), quick('Weekend', [0, 6]), quick('Every day', [0, 1, 2, 3, 4, 5, 6]))),
+        h('div', { class: 'field' }, h('b', { class: 'small' }, 'What should play?'),
+          segmented([['playlist', 'Playlist'], ['web', 'Web page'], ['media', 'Single item']], what, (v) => {
+            what = v;
+            if (v === 'playlist') { s.mediaId = null; s.playlistId = s.playlistId || state.playlists[0]?.id || null; }
+            drawWhat();
+          }),
+          whatBox,
+          h('label', { class: 'row small', style: { marginTop: '4px' } }, 'Show each item for', durI, 'seconds',
+            h('span', { class: 'hint' }, '(empty = the item’s own time; for PowerPoint this is per slide)'))),
+        h('div', { class: 'field' }, h('b', { class: 'small' }, 'Which screens?'), targetChips(s.targets),
+          approved.length ? null : h('span', { class: 'hint' }, 'No displays connected yet — “All displays” will include them once added.')),
+        h('div', { class: 'field' }, h('b', { class: 'small' }, 'When?'),
+          segmented([['weekly', 'Weekly'], ['monthly', 'Monthly'], ['once', 'Once']], s.repeat, (v) => { s.repeat = v; if (v === 'once' && !s.startDate) s.startDate = onceDate.value; drawRepeat(); }),
+          weeklyBox, monthlyBox, onceBox),
         h('label', { class: 'check' }, allDay, 'All day'),
         timeRow,
-        h('details', { open: !!(s.startDate || s.endDate || s.priority || s.name) },
+        h('label', { class: 'check' }, ivOn, 'Repeat within this time (e.g. traffic info every 15 minutes)'),
+        ivBox,
+        periodBox,
+        h('details', { open: !!(s.priority || s.name) },
           h('summary', { style: { cursor: 'pointer', fontWeight: 600 } }, 'More options'),
           h('div', { class: 'stack', style: { marginTop: '12px' } },
             h('label', { class: 'field' }, 'Label', name),
-            h('div', { class: 'grid2' }, h('label', { class: 'field' }, 'Starting on', h('span', { class: 'hint' }, 'Leave empty to start now'), from), h('label', { class: 'field' }, 'Ending on', h('span', { class: 'hint' }, 'Leave empty to repeat forever'), until)),
             h('div', { class: 'field' }, h('b', { class: 'small' }, 'Priority'), h('span', { class: 'hint' }, 'When schedules overlap, the higher priority wins.'),
               segmented([[0, 'Normal'], [5, 'High'], [10, 'Urgent']], s.priority >= 10 ? 10 : s.priority >= 5 ? 5 : 0, (v) => { s.priority = v; })))),
         err,
       ],
       footer: (close) => [
         s.id ? h('button', { class: 'btn danger', onclick: async () => {
-          if (!(await confirmBox('Remove from schedule?', 'The playlist itself is not deleted.', 'Remove'))) return;
+          if (!(await confirmBox('Remove from schedule?', 'The content itself is not deleted.', 'Remove'))) return;
           await api(`/schedules/${s.id}`, { method: 'DELETE' }); close(); await loadAll(); renderPage();
         } }, icon('trash'), 'Remove') : null,
         s.id ? h('label', { class: 'check small' }, h('input', { type: 'checkbox', checked: s.enabled !== false, onchange: (e) => (s.enabled = e.target.checked) }), 'Enabled') : null,
         h('div', { class: 'spacer' }),
         h('button', { class: 'btn', onclick: close }, 'Cancel'),
         h('button', { class: 'btn primary', onclick: async () => {
-          if (!s.days.length) { err.textContent = 'Pick at least one day.'; return; }
+          err.textContent = '';
+          if (s.repeat === 'weekly' && !s.days.length) { err.textContent = 'Pick at least one day.'; return; }
+          if (s.repeat === 'once') s.startDate = onceDate.value || null;
           if (!s.allDay && s.start === s.end) { err.textContent = 'Start and end time can’t be the same.'; return; }
+          s.interval = ivOn.checked ? { everyMinutes: Number(ivEvery.value) || 15, showSeconds: Number(ivShow.value) || 60 } : null;
           try {
+            if (what === 'playlist') {
+              if (!s.playlistId) { err.textContent = 'Pick a playlist.'; return; }
+              s.mediaId = null;
+            } else if (what === 'web' && webChoice === '__new') {
+              let u = newWeb.url.trim();
+              if (!u) { err.textContent = 'Enter the web address.'; return; }
+              if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+              const m = await api('/media', { method: 'POST', body: { type: 'web', url: u, name: newWeb.name.trim(), zoom: newWeb.zoom, refreshSeconds: newWeb.refreshSeconds } });
+              s.mediaId = m.id;
+              webChoice = m.id;
+            }
+            if (what !== 'playlist' && !s.mediaId) { err.textContent = 'Pick what should play.'; return; }
+            if (what !== 'playlist') s.playlistId = null;
             await api(s.id ? `/schedules/${s.id}` : '/schedules', { method: s.id ? 'PUT' : 'POST', body: s });
             close(); await loadAll();
             if (route().page !== 'schedule') go('#/schedule'); else renderPage();
@@ -1153,7 +1364,7 @@
   }
 
   function displayCard(d) {
-    const scheduled = byId(state.playlists, d.scheduledPlaylistId);
+    const scheduled = d.scheduledMediaId || d.scheduledPlaylistId ? contentInfo(d.scheduledMediaId ? `media:${d.scheduledMediaId}` : d.scheduledPlaylistId) : null;
     const np = d.nowPlaying;
     const npMedia = np && state.media.find((m) => m.name === np.name);
     const shot = d.screenshotAt && d.online ? `/api/displays/${d.id}/screenshot?t=${encodeURIComponent(d.screenshotAt)}` : null;
@@ -1193,6 +1404,21 @@
         h('label', { class: 'row small' }, 'Background', h('input', { type: 'color', value: s.ticker.bg, oninput: (e) => (s.ticker.bg = e.target.value) })),
         h('label', { class: 'row small' }, 'Text', h('input', { type: 'color', value: s.ticker.fg, oninput: (e) => (s.ticker.fg = e.target.value) }))));
     tickerBox.hidden = !s.ticker.enabled;
+    // Weekly restart (Player app): lets Windows install updates and keeps long-running screens fresh.
+    s.maintenance = Object.assign({ weeklyRestart: true, day: 0, time: '03:00' }, s.maintenance || {});
+    const restartDetail = h('div', { class: 'row wrap small', style: { gap: '8px', marginLeft: '26px' } },
+      'Every', h('select', { style: { width: 'auto' }, onchange: (e) => (s.maintenance.day = Number(e.target.value)) },
+        [0, 1, 2, 3, 4, 5, 6].map((n) => h('option', { value: n, selected: n === s.maintenance.day }, ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][n]))),
+      'at', h('input', { type: 'time', value: s.maintenance.time, style: { width: 'auto' }, oninput: (e) => (s.maintenance.time = e.target.value || '03:00') }));
+    restartDetail.hidden = !s.maintenance.weeklyRestart;
+    const restartBox = h('div', { class: 'field' },
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: s.maintenance.weeklyRestart, onchange: (e) => { s.maintenance.weeklyRestart = e.target.checked; restartDetail.hidden = !e.target.checked; } }),
+        'Weekly restart'),
+      restartDetail,
+      h('span', { class: 'hint', style: { marginLeft: '26px' } }, isApp(d)
+        ? 'Windows restarts the computer so updates get installed; on macOS and Linux the player app restarts.'
+        : 'Only for screens running the KevCast Player app (this one uses a browser).'));
+
     modal({
       title: `Display settings — ${d.name}`,
       body: [
@@ -1208,6 +1434,7 @@
           h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: s.ticker.enabled, onchange: (e) => { s.ticker.enabled = e.target.checked; tickerBox.hidden = !e.target.checked; } }), 'Show news ticker'),
           h('label', { class: 'row small' }, 'Background', h('input', { type: 'color', value: s.background || '#000000', oninput: (e) => (s.background = e.target.value) }))),
         tickerBox,
+        restartBox,
         h('label', { class: 'field' }, 'Notes', h('input', { value: s.notes || '', placeholder: 'Location, hardware, contact…', oninput: (e) => (s.notes = e.target.value) })),
       ],
       footer: (close) => [
@@ -1218,7 +1445,7 @@
         h('div', { class: 'spacer' }),
         h('button', { class: 'btn', onclick: close }, 'Cancel'),
         h('button', { class: 'btn primary', onclick: async () => {
-          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, group: s.group, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, ticker: s.ticker, background: s.background, notes: s.notes } });
+          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, group: s.group, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, ticker: s.ticker, background: s.background, notes: s.notes, maintenance: s.maintenance } });
           close(); toast('Saved — the screen updates in a moment', 'ok'); await loadAll(); renderPage();
         } }, 'Save'),
       ],
