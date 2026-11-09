@@ -59,7 +59,7 @@ Upgrade by running a newer installer over the old one. Uninstall via *Settings â
 ### Linux: kevcast-server .deb
 
 ```bash
-sudo apt install ./kevcast-server_0.1.0_amd64.deb     # arm64 for Raspberry Pi 4/5
+sudo apt install ./kevcast-server_0.2.0_amd64.deb     # arm64 for Raspberry Pi 4/5
 ```
 `apt` pulls in LibreOffice, Poppler and matching fonts automatically. The package:
 - installs to `/opt/kevcast-server` and creates the `kevcast` system user

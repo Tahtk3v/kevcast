@@ -1,7 +1,7 @@
 {
   "name": "kevcast-desktop",
   "productName": "KevCast",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "KevCast Player (signage app for screens) and KevCast Studio (management app).",
   "author": {
     "name": "Kevin B",
@@ -18,12 +18,15 @@
     "dist": "npm run dist:player && npm run dist:studio"
   },
   "devDependencies": {
-    "electron": "^38.0.0",
-    "electron-builder": "^26.0.0"
+    "electron": "^42.11.18",
+    "electron-builder": "^26.18.0"
   },
   "homepage": "https://github.com/tahtk3v/kevcast",
   "repository": {
     "type": "git",
     "url": "https://github.com/tahtk3v/kevcast.git"
+  },
+  "overrides": {
+    "minimatch@>=7.0.0 <11.0.1": "^11.0.5"
   }
 }

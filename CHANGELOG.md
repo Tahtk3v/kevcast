@@ -4,6 +4,12 @@ All notable changes to KevCast are listed here. The format follows [Keep a Chang
 and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.2.0] - 2026-11-09
+### Security
+- **Electron 38.8.6 → 42.11.18** for KevCast Player and KevCast Studio. This fixes [GHSA-jr5w-w6x2-84p9](https://github.com/electron/electron/security/advisories/GHSA-jr5w-w6x2-84p9), the mitigation for compromised eMudhra intermediate certificates, and includes later Chromium and V8 security backports. (Reported by Dependabot in #3.)
+- Build tooling: `minimatch` ≥ 11.0.1 for [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), through an npm override. electron-builder is updated to 26.18.0. `npm audit` reports 0 vulnerabilities for the server and the desktop apps.
+
 ### Added
 - **Separate installers** for the Server, Player and Studio.
   - The server installers bundle their own Node.js runtime:
