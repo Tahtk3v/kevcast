@@ -12,6 +12,14 @@ Unicode true
 SetCompressor /SOLID lzma
 RequestExecutionLevel admin
 
+; Compile-time path separator: makensis on Windows needs "\" (wildcards fail with "/"),
+; makensis on Linux/macOS (used to check the script) needs "/".
+!ifdef NSIS_WIN32_MAKENSIS
+  !define S "\"
+!else
+  !define S "/"
+!endif
+
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "x64.nsh"
@@ -48,8 +56,8 @@ Var ServerPort
 ; --------------------------------------------------------------------------
 ; Pages
 ; --------------------------------------------------------------------------
-!define MUI_ICON "${ASSETS}/server.ico"
-!define MUI_UNICON "${ASSETS}/server.ico"
+!define MUI_ICON "${ASSETS}${S}server.ico"
+!define MUI_UNICON "${ASSETS}${S}server.ico"
 !define MUI_ABORTWARNING
 !define MUI_COMPONENTSPAGE_SMALLDESC
 
@@ -60,7 +68,7 @@ Var ServerPort
   !define MUI_WELCOMEPAGE_TEXT "This installs the KevCast Server: it stores your content and schedules, converts PowerPoint files and serves the screens.$\r$\n$\r$\nIt runs in the background and starts automatically with Windows. You manage it from KevCast Web Studio in your browser.$\r$\n$\r$\nClick Next to continue."
 !endif
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "${SERVER_DIR}/app/LICENSE"
+!insertmacro MUI_PAGE_LICENSE "${SERVER_DIR}${S}app${S}LICENSE"
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -98,9 +106,9 @@ Section "Server" SecServer
   ${EndIf}
 
   SetOutPath "$INSTDIR\Server"
-  File /r "${SERVER_DIR}/*.*"
-  File "${SCRIPTS}/service.ps1"
-  File "${SCRIPTS}/install-libreoffice.ps1"
+  File /r "${SERVER_DIR}${S}*.*"
+  File "${SCRIPTS}${S}service.ps1"
+  File "${SCRIPTS}${S}install-libreoffice.ps1"
 
   DetailPrint "Registering the KevCast Server service and firewall rules..."
   nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\Server\service.ps1" -Action install -ServerDir "$INSTDIR\Server"'
@@ -158,7 +166,7 @@ Section "KevCast Player (for screens)" SecPlayer
   ; Close a running player (it only exits with Alt+Q, so end the process for the upgrade).
   nsExec::Exec 'taskkill /F /IM "KevCast Player.exe"'
   SetOutPath "$INSTDIR\Player"
-  File /r "${PLAYER_DIR}/*.*"
+  File /r "${PLAYER_DIR}${S}*.*"
   CreateDirectory "$SMPROGRAMS\KevCast"
   CreateShortcut "$SMPROGRAMS\KevCast\KevCast Player.lnk" "$INSTDIR\Player\KevCast Player.exe"
   CreateShortcut "$DESKTOP\KevCast Player.lnk" "$INSTDIR\Player\KevCast Player.exe"
@@ -172,7 +180,7 @@ Section "KevCast Studio (desktop management app)" SecStudio
   SetShellVarContext all
   nsExec::Exec 'taskkill /F /IM "KevCast Studio.exe"'
   SetOutPath "$INSTDIR\Studio"
-  File /r "${STUDIO_DIR}/*.*"
+  File /r "${STUDIO_DIR}${S}*.*"
   CreateDirectory "$SMPROGRAMS\KevCast"
   CreateShortcut "$SMPROGRAMS\KevCast\KevCast Studio.lnk" "$INSTDIR\Studio\KevCast Studio.exe"
   CreateShortcut "$DESKTOP\KevCast Studio.lnk" "$INSTDIR\Studio\KevCast Studio.exe"

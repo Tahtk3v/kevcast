@@ -61,14 +61,14 @@ jobs:
       - name: Build KevCast Server .deb (amd64 + arm64)
         if: runner.os == 'Linux'
         run: |
-          packaging/linux/build-deb.sh amd64
-          packaging/linux/build-deb.sh arm64
+          bash packaging/linux/build-deb.sh amd64
+          bash packaging/linux/build-deb.sh arm64
 
       - name: Build KevCast Server .pkg (Apple silicon + Intel)
         if: runner.os == 'macOS'
         run: |
-          packaging/macos/build-pkg.sh arm64
-          packaging/macos/build-pkg.sh x64
+          bash packaging/macos/build-pkg.sh arm64
+          bash packaging/macos/build-pkg.sh x64
 
       - uses: actions/upload-artifact@v5
         with:
