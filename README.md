@@ -8,7 +8,7 @@ even when the network goes down.
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 ![Platforms](https://img.shields.io/badge/server-Windows%20%7C%20Linux%20%7C%20macOS-informational)
 
-KevCast takes its inspiration from EasyScreen and is a simpler alternative to Xibo.
+KevCast takes its inspiration from Easescreen and is a simpler alternative to Xibo.
 
 ![KevCast Web Studio: week overview of what a screen plays](docs/images/schedule-week-overview.png)
 

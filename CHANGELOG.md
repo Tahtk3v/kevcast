@@ -13,6 +13,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
   - The Linux install script installs the current LTS from NodeSource when the system's Node.js is too old.
 - The minimum Node.js version for running the server from source is now 20. Node.js 18 is end-of-life.
 - GitHub Actions updated: `checkout` v7, `setup-node` v7, `upload-artifact` v7, `download-artifact` v8. This removes the "Node.js 20 is deprecated" warnings in the workflow runs.
+- **Electron 42.11.18 → 45.2.3** for KevCast Player and KevCast Studio (newer Chromium). This applies Dependabot's #5. The GitHub Actions updates above cover Dependabot's #4.
 
 ### Added
 - **Automatic releases.** Pushing a version tag (`v0.2.1`) builds every installer and publishes a GitHub Release with all of them attached. The release notes are this changelog's section for that version. The release job checks that the tag matches `package.json`.
