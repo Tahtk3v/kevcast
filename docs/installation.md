@@ -165,10 +165,17 @@ See [Configuration](configuration.md) for all environment variables.
 
 ## First run
 
+![First run](images/setup.png)
+
+
 Open **KevCast Web Studio**, the desktop icon or `http://<server-address>:8080/admin/`. The first visit asks you to create the administrator account and
 name your organisation. That name is shown on idle screens and in the apps' server list.
 
-Opening the server address without a path, `http://<server-address>:8080/`, shows a start page. It has a button to the Web Studio and the exact address that browser-based screens must open.
+Opening the server address without a path, `http://<server-address>:8080/`, shows a start page.
+
+![Start page](images/start-page.png)
+
+The start page has a button to the Web Studio and the exact address that browser-based screens must open.
 
 Next, check **Settings → Server**: both *LibreOffice* and *Slide renderer* should show **OK**.
 

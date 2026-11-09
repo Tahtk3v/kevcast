@@ -37,12 +37,14 @@
 
 ```js
 settings:  { orgName, adminUser: { username, salt, hash }, provisioningKey, serverId }
-media:     { id, name, type: 'image'|'video'|'presentation'|'web'|'text', file, slides[], url, text{}, status, error, size }
+media:     { id, name, type: 'image'|'video'|'presentation'|'web'|'text', file, slides[], url, zoom, refreshSeconds, text{}, status, error, size }
 playlists: { id, name, color, defaultDuration, transition, items: [{ id, mediaId, duration, transition, enabled, mute }] }
-schedules: { id, name, playlistId, enabled, priority, allDay, start, end, days[], startDate, endDate,
-             targets: { displays: [id], groups: [name] } }
+schedules: { id, name, playlistId | mediaId, itemDuration, enabled, priority, repeat: 'weekly'|'monthly'|'once',
+             days[], everyWeeks, monthDay, allDay, start, end, startDate, endDate,
+             interval: { everyMinutes, showSeconds } | null, targets: { displays: [id], groups: [name] } }
 displays:  { id, name, group, approved, pairingCode, token, defaultPlaylistId, orientation, fit, background,
-             showClock, ticker{}, lastSeen, ip, resolution, userAgent, nowPlaying{}, cache{}, screenshotAt }
+             showClock, ticker{}, maintenance{ weeklyRestart, day, time }, lastSeen, ip, resolution, userAgent,
+             nowPlaying{}, cache{}, screenshotAt }
 ```
 
 Media files live in `media/<id>/original.<ext>`. Slides are in `media/<id>/slides/slide-N.jpg`.
@@ -59,14 +61,26 @@ PDFs skip step 2. Failures store a readable `error` on the media item, shown in 
 
 ## Scheduling
 
-`resolve(schedules, display, now)` in `shared/schedule.js`:
+`shared/schedule.js` is used by the server (dashboard), the Web Studio (calendar and week overview) and the player.
 
-1. Keep entries that are enabled, target this display (display id, its group, or everyone), and are active now:
-   day of week, date range, and time window. A window like 22:00–06:00 belongs to the day it **starts**.
-2. Sort by priority, then specificity (display > group > all), then newest.
-3. The winner's playlist plays. With no winner, the display's default playlist plays, and with no default, the idle clock.
+1. **Does the entry occur on this date?** (`occursOn`)
+   - `once`: the date equals `startDate`.
+   - `monthly`: the day of the month equals `monthDay` (clamped to the last day of shorter months).
+   - `weekly`: the day is in `days`, and for `everyWeeks > 1` the week number counted from `startDate` (or the creation date) fits the interval.
+   - The date must also lie within `startDate`–`endDate`.
+2. **Is the time window open?** All day, or `start`–`end`. A window like 22:00–06:00 belongs to the day it **starts**.
+3. **Recurring entries** (`interval`) are only active for the first `showSeconds` of every `everyMinutes`, counted from the window start.
+4. **Pick the winner**, sorting by:
+   1. priority
+   2. recurring entries first (so they interrupt)
+   3. specificity (display > group > all)
+   4. newest
+5. The winner's playlist (or single item, key `media:<id>`) plays, with `itemDuration` overriding each item's time.
+   Without a winner the display's default playlist plays, and without a default, the idle clock.
 
-The player runs this every 15 seconds against its own copy of the schedule, so it keeps working while disconnected.
+The player runs this every 5 seconds against its own copy of the schedule. It keeps working while disconnected,
+and remembers the position in each playlist, so a playlist resumes after a recurring item.
+`dayTimeline()` samples a day in 5-minute steps for the week overview.
 
 ## Player protocol
 
@@ -89,6 +103,8 @@ Every database change triggers an `update` event (debounced to 300 ms), and play
 | `/media/*` | Cache first, served from disk with HTTP Range support (video) |
 | `/api/player/manifest`, `/player/*`, `/shared/schedule.js` | Network first (8 s timeout), saved to disk, disk copy when offline |
 | Anything else | Passed through |
+
+Requests from web-page items to other sites pass through untouched, except that `X-Frame-Options` and CSP `frame-ancestors` are removed (also through `webRequest` for https), so pages that forbid embedding still display.
 
 Each fresh manifest triggers a background sync that streams every referenced image, slide and video to disk.
 Unreferenced files are pruned only after a sync completes without errors.

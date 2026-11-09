@@ -47,6 +47,8 @@ Machine-wide settings for KevCast Player. Create the file in:
 | `windowed` | boolean | `false` | Run in a normal 1280×720 window instead of fullscreen (for testing) |
 | `nightlyReload` | `"HH:MM"` | `"04:00"` | Daily refresh time |
 | `disableGpu` | boolean | `false` | Turn off hardware acceleration (for some old or virtual GPUs that show a black screen) |
+| `weeklyRestart` | boolean | `true` | Set to `false` to never perform the weekly restart on this device, whatever the Web Studio says |
+| `rebootCommand` | string | – | macOS/Linux: command used for the weekly restart instead of restarting only the app, e.g. `"sudo /sbin/reboot"` |
 
 Lookup order for every key, first match wins:
 1. `--server=…` on the command line (server only)
@@ -77,3 +79,4 @@ These are set per screen under **Displays → Settings**, or for many screens at
 | Background | colour |
 | Show clock | on/off |
 | News ticker | on/off, text (one message per line), speed (slow/normal/fast), colours |
+| Weekly restart | on/off (default on), day of the week (default Sunday), time (default 03:00). Player app only. |

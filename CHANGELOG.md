@@ -15,8 +15,24 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - **Start page** at the server address with a link to the Web Studio and the exact page browser-based screens must open. It is also shown on the Displays page and by the installers.
 - App icons for KevCast Player, KevCast Studio and the server.
 
+- **Web pages in the schedule.** Schedule a web page (or any single item) directly, without a playlist. Create one inline with **+ New web page…**. Web pages get **zoom** and **auto-reload** settings, plus a preview.
+- The **KevCast Player app** shows web pages that normally refuse to be embedded (`X-Frame-Options`, CSP `frame-ancestors`), such as departure boards and traffic info.
+- **Richer scheduling**:
+  - repeat weekly (every 1–4 weeks), monthly (on a day of the month) or once
+  - a validity period (*valid from / until*)
+  - **repeat within a time window** ("every 15 minutes, show for 60 seconds"), which interrupts the normal content
+  - **seconds per item** for each scheduled entry
+- **Week overview**: one row per day showing exactly what a screen plays, including its default playlist and recurring items.
+- **Weekly restart** of Player app screens (default Sunday 03:00, configurable per display). Windows restarts the computer so updates install. `rebootCommand` and `weeklyRestart` are available in `player.json`.
+- Screenshots throughout the documentation and the README.
+
+### Changed
+- Players check the schedule every 5 seconds (was 15), and resume a playlist where it left off after an interruption.
+- A single web page that stays on screen is no longer reloaded each time its duration ends.
+
 ### Fixed
 - The Windows MSI build failed because no application icon was set.
+- Web pages appeared only after an 8-second delay on players.
 
 ## [0.1.0] - 2026-11-09
 ### Added

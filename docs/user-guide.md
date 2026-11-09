@@ -16,6 +16,9 @@ Changes reach the screens within seconds. Nothing needs a "publish" button.
 
 ## Dashboard
 
+![Dashboard](images/dashboard.png)
+
+
 - **Counters**: screens online, media, playlists and active schedules. Click one to go there.
 - **Get started in 4 steps**: a checklist that disappears once you have content, a playlist, a screen and a schedule.
 - **Screens**: every display with its live status and what it is showing right now (including the slide number).
@@ -23,6 +26,9 @@ Changes reach the screens within seconds. Nothing needs a "publish" button.
 - A warning appears at the top if the server can't convert PowerPoint (LibreOffice or Poppler missing).
 
 ## Media
+
+![Media library](images/media.png)
+
 
 Everything you can show on a screen lives here.
 
@@ -38,9 +44,26 @@ Drag files **anywhere** onto the admin window, or click **Upload files**. A prog
 Upload limit: 4 GB per file.
 
 ### Web pages
-Click **Web page** and enter an address, e.g. a Power BI *Publish to web* link, a Grafana dashboard or an intranet page.
-Some sites block being shown inside another page. They then show as a blank or error page;
-see [Troubleshooting](troubleshooting.md#a-web-page-stays-blank).
+Some information only exists as a web page: train departures, traffic info, weather, a Power BI or Grafana dashboard.
+Click **Web page**, enter the address (e.g. `https://example.org/departures`) and give it a name.
+
+![Add a web page](images/web-page-dialog.png)
+
+| Setting | What it does |
+|---|---|
+| **Zoom** | Scales the page. Below 100% fits more of a desktop page on a TV, and above 100% makes small text readable from a distance. |
+| **Reload the page** | Reloads it every minute, 5 minutes, 15 minutes or hour. Use this for pages that don't refresh themselves. |
+| **Add & schedule** | Saves the page and opens the schedule dialog straight away |
+
+**Preview on a screen** (when editing a page) shows it exactly as a screen will.
+
+You can put a web page in a playlist like any other item, or [schedule it directly](#scheduling-a-web-page).
+
+> **Sites that refuse to be embedded.** Many sites forbid being shown inside another page. The **KevCast Player app**
+> ignores that restriction, because a signage screen is a display, not a browser, so departure boards and
+> traffic maps work there. In a plain browser player such sites stay blank. See [Troubleshooting](troubleshooting.md#a-web-page-stays-blank).
+
+![A web page on a screen](images/player-webpage.png)
 
 ### Text slides
 Click **Text slide** to make an announcement without PowerPoint. You set:
@@ -50,18 +73,26 @@ Click **Text slide** to make an announcement without PowerPoint. You set:
 
 ### Managing media
 Click a card to open its details. From there you can:
+
+![Media details](images/media-details.png)
+
 - **Rename** it.
 - **Browse slides**: click a thumbnail in the strip to preview that slide.
 - **Add to playlist**, or create a new playlist from the item.
 - **Re-convert** a presentation, for example after installing a font on the server.
-- **Edit text** (text slides only).
+- **Edit text** (text slides) or **Edit web page** (web pages).
+- **Schedule** the item on its own, without a playlist.
 - **Delete** it. The item is also removed from every playlist.
 
 **Used in** lists the playlists that contain the item. Use the filter chips (Images, Videos, PowerPoint & PDF, …) and the search box to find things.
 
 ## Playlists
 
-A playlist is an ordered set of media that loops. The page has three columns: your playlists, the editor and the media library.
+A playlist is an ordered set of media that loops.
+
+![Playlist editor](images/playlist-editor.png)
+
+The page has three columns: your playlists, the editor and the media library.
 
 | Action | How |
 |---|---|
@@ -80,40 +111,76 @@ Changes save automatically. *All changes saved* appears at the top. The total ru
 
 ## Schedule
 
-The schedule decides **what plays when, and where**.
+The schedule decides **what plays when, and where**. There are two views:
+- **Calendar**: plan and edit.
+- **Week overview**: see exactly what a screen shows, day by day.
 
-### The calendar
-- A week view (Monday to Sunday) with **This week** and arrows to page through weeks. Today is highlighted and a red line shows the current time.
+### Calendar
+
+![Schedule calendar](images/schedule-calendar.png)
+
+- A week view (Monday to Sunday), with **This week** and arrows to page through weeks. Today is highlighted and a red line shows the current time.
 - **Click and drag** on a day to make a new entry for that time range (snaps to 30 minutes). Click a block to edit it.
-- The **display filter** (top right) shows only entries that apply to one screen. It also says what that screen plays outside scheduled times.
-- Overlapping entries are drawn side by side. Disabled entries are striped.
-- Below the calendar a table lists every entry, with an on/off switch.
+- Blocks that overlap are drawn side by side. Recurring items (↻) are striped, and disabled entries are faded.
+- The **display filter** (top right) shows only the entries that apply to one screen.
+- Below the calendar, a table lists every entry with *what*, *when*, *screens*, *priority* and an on/off switch.
 
-### An entry
+### Week overview
+
+![Week overview](images/schedule-week-overview.png)
+
+Pick a screen at the top right. Each day of the week is one bar from 00:00 to 24:00, showing what that screen will **actually** play:
+- coloured bars for scheduled content
+- light, striped bars (◦) for the screen's default playlist
+- **↻ chips** under the bar for items that repeat within a time window, e.g. *Train departures every 15 min for 60 s, 07:00–09:30*
+
+Click a bar or chip to edit it, or click an empty part of a day to schedule something new on that day.
+
+### Adding something to the schedule
+
+Click **Add to schedule**, drag on the calendar, or use **Schedule** on a playlist, media item or web page.
+
+![Schedule dialog](images/schedule-dialog-webpage.png)
+
 | Field | Meaning |
 |---|---|
-| What should play? | The playlist |
-| Which screens? | **All displays**, one or more groups (▦), and/or individual displays |
-| Days | Mon–Sun toggles, plus *Weekdays*, *Weekend* and *Every day* shortcuts |
-| All day / From–Until | The time window. If *Until* is earlier than *From*, it runs past midnight (e.g. 22:00–06:00). |
-| Starting on / Ending on | Optional date range, e.g. a campaign from 1 to 14 December |
-| Priority | **Normal**, **High** or **Urgent**, used when entries overlap |
-| Label | Optional name shown on the calendar |
-| Enabled | Switch an entry off without deleting it |
+| **What should play?** | A **Playlist**, a **Web page** (pick one, or **+ New web page…** to add one right here), or a **Single item** such as one PowerPoint, image or video |
+| **Show each item for** | Seconds each item stays on screen before the next one. Empty = the item's own time. For PowerPoint it is per slide. |
+| **Which screens?** | **All displays**, one or more groups (▦), and/or individual displays |
+| **When?** | **Weekly** (pick days, then *every week*, *every 2/3/4 weeks*), **Monthly** (on day 1–31; the 31st means the last day in shorter months) or **Once** (a single date) |
+| **All day / From–Until** | The time window. If *Until* is earlier than *From*, it runs past midnight (e.g. 22:00–06:00). |
+| **Repeat within this time** | Show it **every N minutes for N seconds**, then go back to the normal content. For example: traffic info every 15 minutes for 60 seconds between 07:00 and 09:30. |
+| **Valid from / Valid until** | The period in which the entry counts, e.g. a campaign from 1 to 14 December. Leave empty for "from now" and "forever". |
+| **Label** (more options) | Name shown on the calendar |
+| **Priority** (more options) | **Normal**, **High** or **Urgent**, used when entries overlap |
+| **Enabled** | Switch an entry off without deleting it |
+
+![Repeat options](images/schedule-dialog-repeat.png)
+
+### Scheduling a web page
+1. **Add to schedule** → **What should play?** → **Web page**.
+2. Pick an existing page, or choose **+ New web page…** and type the address (zoom and reload can be set right there).
+3. Set **Show each item for**: how long the page stays up before the next scheduled content. With a single web page, this only matters together with *Repeat within this time*.
+4. Choose the screens and the time, for example weekdays 07:00–09:30 with *Repeat within this time: every 15 minutes, 60 seconds*.
 
 ### Which entry wins?
 When more than one entry is active for a screen at the same moment:
 1. The **highest priority** wins (Urgent > High > Normal).
-2. On equal priority, the **most specific** entry wins: aimed at this display > aimed at its group > aimed at everyone.
-3. Otherwise the **most recently created** entry wins.
+2. On equal priority, a **recurring item** (↻) wins during its few seconds. That's how it interrupts the normal content.
+3. Then the **most specific** entry wins: aimed at this display > aimed at its group > aimed at everyone.
+4. Otherwise the **most recently created** entry wins.
 
 If no entry is active, the screen plays its **default playlist**. If it has none, it shows a clock with your organisation name.
+After an interruption, a playlist continues where it left off.
 
 Screens carry a copy of the schedule, so switches happen on time even when the server is unreachable.
 
 ## Displays and groups
 
 ### Adding a display
+
+![Displays](images/displays.png)
+
 1. Start **KevCast Player** on the screen, or open `http://<server>:8080/player/` in its browser. The **Connect another screen** card at the bottom of the Displays page shows the exact address, with a copy button.
 2. The screen shows a 6-character code. The **Displays** menu gets a "1 new" badge.
 3. Click **Add display** and fill in:
@@ -138,6 +205,9 @@ For many screens at once, skip pairing with a [provisioning key](rollout.md).
   - **Schedule**: opens the calendar filtered to this screen
 
 ### Display settings
+
+![Display settings](images/display-settings.png)
+
 | Setting | Options |
 |---|---|
 | Name, group, notes | Free text. Type a new group name to create a group. |
@@ -147,6 +217,7 @@ For many screens at once, skip pairing with a [provisioning key](rollout.md).
 | Background | Colour behind images that don't fill the screen |
 | Show clock | Clock in the top-right corner |
 | News ticker | Scrolling text bar at the bottom. One message per line. Speed and colours are adjustable. |
+| Weekly restart | **On by default: every Sunday at 03:00.** For screens running the KevCast Player app. On **Windows** the computer restarts, so pending Windows updates get installed. On macOS and Linux the player app restarts (see [player docs](player.md#weekly-restart)). Choose another day or time, or switch it off. |
 | Remove | Disconnects the screen. It shows a new pairing code. |
 
 ### Groups
@@ -157,6 +228,9 @@ The Displays page is organised by group. Each group header has these actions:
 
 ## Send to screens
 
+![Send to screens](images/send-to-screens.png)
+
+
 **Send to screens** is the fastest way to put a playlist on many screens. Find it on the Displays page (per group and at the top) and in the playlist editor.
 
 1. Pick the playlist and the screens: all, groups and/or individual screens. The dialog shows how many screens that is.
@@ -166,6 +240,9 @@ The Displays page is organised by group. Each group header has these actions:
    - **Schedule…**: opens the schedule dialog with the screens already filled in.
 
 ## Settings
+
+![Settings](images/settings.png)
+
 
 - **General**: organisation name, shown on idle screens and in the apps.
 - **Change password**.

@@ -52,13 +52,24 @@ or check the schedule with the display filter. A playlist whose items are disabl
 Press **Alt+Q**, or your configured `exitShortcut`. Alt+F4 and the close button are ignored on purpose.
 
 ### A web page stays blank
-Many sites (Google, Microsoft 365, banks, social media) forbid being embedded with `X-Frame-Options` or
-`Content-Security-Policy: frame-ancestors`. Use the site's embed or *publish to web* link (Power BI,
-Google Slides, YouTube embed URLs), or take a screenshot instead.
+Many sites (public transport, Google, Microsoft 365, banks, social media) forbid being embedded, using
+`X-Frame-Options` or `Content-Security-Policy: frame-ancestors`.
+- **KevCast Player app**: these restrictions are ignored, so such pages show. If a page is still blank, it probably needs a login or blocks automated browsers. Check it with **Preview on a screen** in the web page dialog.
+- **Browser players** can't bypass this. Use the app on that screen, or the site's embed/*publish to web* link (Power BI, Google Slides, YouTube embed URLs).
+- Pages that show a cookie banner: the banner appears once per player and then remembers your choice, if you click it on the screen with a mouse. Otherwise pick a page or embed URL without one.
+- Text too small or too big? Change the **Zoom** of the web page.
 
 ### Videos don't play
 - Use H.264/AAC MP4. HEVC/H.265 and some MOV files don't play in all players.
 - Videos are muted, so they can start without a click. Sound isn't supported yet.
+
+### The screen restarts on Sunday night
+That's the **weekly restart** (default Sunday 03:00), so Windows updates get installed. Change or switch it off per screen in **Displays → Settings**.
+
+### A recurring item (every N minutes) doesn't appear
+- It only shows inside its time window, for *show for* seconds at every *every N minutes*, counted from the window start (07:00, 07:15, 07:30, …).
+- A higher-priority entry at the same time wins. Check the **Week overview** for that screen.
+- Screens check the schedule every 5 seconds, so very short durations (under ~10 s) may be cut short.
 
 ### The screen doesn't come back after a power cut
 - Turn on **automatic login** for the user account on the screen PC.
