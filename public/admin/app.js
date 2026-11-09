@@ -1035,11 +1035,28 @@
         approved.length ? h('button', { class: 'btn', onclick: () => sendDialog({}) }, icon('play'), 'Send to screens') : null,
         h('button', { class: 'btn primary', onclick: pairDialog }, icon('plus'), 'Add display')),
       pending.length ? h('div', { class: 'alert' }, h('b', {}, `${pending.length} screen${pending.length > 1 ? 's are' : ' is'} waiting to be connected. `), 'Click “Add display” and enter the code shown on the screen.') : null,
-      approved.length ? sections.map(section) :
+      approved.length ? [sections.map(section), connectHelp()] :
         h('div', { class: 'card empty' }, h('h3', {}, 'No displays yet'),
           h('p', {}, 'Install the KevCast Player app on the screen (it finds this server automatically), or open this address in its browser:'), h('div', { class: 'urlbox', style: { maxWidth: '420px', margin: '10px auto' } }, playerUrl()),
           h('button', { class: 'btn primary', onclick: pairDialog }, 'I see a code — add display')),
     ];
+  }
+
+  /** How to connect another screen: app or browser, with the exact page a browser must open. */
+  function connectHelp() {
+    const urls = (state.overview?.playerUrls || []).length ? state.overview.playerUrls : [`${location.origin}/player/`];
+    return h('div', { class: 'card pad stack', style: { marginTop: '8px' } },
+      h('h2', {}, 'Connect another screen'),
+      h('div', { class: 'grid2' },
+        h('div', { class: 'stack', style: { gap: '6px' } },
+          h('b', {}, 'With the KevCast Player app (recommended)'),
+          h('span', { class: 'muted small' }, 'For Windows, macOS, Linux and Raspberry Pi. It finds this server automatically, starts with the computer, keeps playing offline and only closes with Alt+Q.')),
+        h('div', { class: 'stack', style: { gap: '6px' } },
+          h('b', {}, 'With a web browser (smart TV, any PC)'),
+          h('span', { class: 'muted small' }, 'Open this page on the screen and press F11 for full screen:'),
+          urls.map((u) => h('div', { class: 'urlbox' }, h('span', { style: { flex: 1 } }, u),
+            h('button', { class: 'btn sm', onclick: () => { navigator.clipboard?.writeText(u); toast('Copied'); } }, icon('copy')))))),
+      h('span', { class: 'muted small' }, 'The screen then shows a 6-character code. Click “Add display” above and enter it.'));
   }
 
   function renameGroupDialog(g) {

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KevCast</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><rect x='7' y='9' width='18' height='12' rx='2' fill='white'/><rect x='13' y='22' width='6' height='2' fill='white'/></svg>">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #e2e8f0;
+      background: radial-gradient(circle at 20% 10%, #312e81, #0b1020 60%); display: grid; place-items: center; padding: 24px; }
+    main { width: min(880px, 100%); }
+    .logo { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 800; }
+    .mark { width: 40px; height: 40px; border-radius: 11px; background: linear-gradient(135deg, #6366f1, #db2777); }
+    h1 { font-size: 15px; font-weight: 500; color: #94a3b8; margin: 6px 0 28px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: #121a2e; border: 1px solid #23304d; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
+    .card h2 { margin: 0; font-size: 19px; }
+    .card p { margin: 0; color: #94a3b8; }
+    .btn { display: inline-block; background: #818cf8; color: #0b1020; font-weight: 700; padding: 11px 18px; border-radius: 10px; text-decoration: none; text-align: center; }
+    .url { display: flex; gap: 8px; align-items: center; background: #0b1020; border: 1px solid #2e3b5c; border-radius: 10px; padding: 10px 12px;
+      font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; word-break: break-all; }
+    .url span { flex: 1; }
+    .url button { background: #1e2448; color: #c7d2fe; border: 0; border-radius: 7px; padding: 5px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+    ol { margin: 0; padding-left: 20px; color: #cbd5e1; }
+    li { margin: 4px 0; }
+    .muted { color: #64748b; font-size: 13px; }
+    a { color: #a5b4fc; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="logo"><div class="mark"></div><span id="org">KevCast</span></div>
+    <h1>KevCast narrowcasting server <span id="ver"></span></h1>
+    <div class="grid">
+      <section class="card">
+        <h2>Manage content</h2>
+        <p>Upload PowerPoint, build playlists, plan the schedule and manage screens.</p>
+        <a class="btn" href="/admin/">Open KevCast Web Studio</a>
+        <p class="muted">Prefer an app? Install <b>KevCast Studio</b>. It finds this server automatically.</p>
+      </section>
+      <section class="card">
+        <h2>Turn a screen into a player</h2>
+        <p><b>With a web browser</b> (smart TV, PC, tablet): open this page in full screen:</p>
+        <div id="urls"><div class="url"><span id="fallback"></span></div></div>
+        <ol>
+          <li>The screen shows a 6-character code.</li>
+          <li>In the Web Studio go to <b>Displays → Add display</b> and enter it.</li>
+          <li>Press <b>F11</b> on the screen for full screen.</li>
+        </ol>
+        <p class="muted">For PCs, mini-PCs and Raspberry Pi, the <b>KevCast Player</b> app is recommended: it starts automatically,
+          keeps playing offline and can only be closed with Alt+Q.</p>
+      </section>
+    </div>
+    <p class="muted" style="margin-top:22px">Documentation: <a href="https://github.com/tahtk3v/kevcast/tree/main/docs">github.com/tahtk3v/kevcast</a></p>
+  </main>
+  <script>
+    const fallback = `${location.protocol}//${location.host}/player/`;
+    document.getElementById('fallback').textContent = fallback;
+    fetch('/api/info').then((r) => r.json()).then((info) => {
+      document.getElementById('org').textContent = info.orgName || 'KevCast';
+      document.getElementById('ver').textContent = `v${info.version}`;
+      // Prefer the address this page was opened with, unless that is "localhost" (useless for other devices).
+      const local = /^(localhost|127\.|\[::1\])/.test(location.hostname);
+      const urls = local && info.playerUrls.length ? info.playerUrls : [fallback];
+      const box = document.getElementById('urls');
+      box.replaceChildren(...urls.map((u) => {
+        const row = document.createElement('div');
+        row.className = 'url';
+        const s = document.createElement('span');
+        s.textContent = u;
+        const b = document.createElement('button');
+        b.textContent = 'Copy';
+        b.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(u); b.textContent = 'Copied'; };
+        row.append(s, b);
+        return row;
+      }));
+    }).catch(() => {});
+  </script>
+</body>
+</html>

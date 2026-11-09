@@ -187,7 +187,17 @@ function playerManifest(d) {
 // Static files
 // ---------------------------------------------------------------------------
 const pub = path.join(__dirname, '..', 'public');
-app.get('/', (req, res) => res.redirect('/admin/'));
+// Start page: shows where to manage KevCast and which page screens should open.
+app.get('/', (req, res) => res.sendFile(path.join(pub, 'index.html')));
+app.get('/api/info', (req, res) => {
+  const port = req.socket.localPort || PORT;
+  res.json({
+    orgName: db.data.settings.orgName,
+    version: pkg.version,
+    playerUrls: lanAddresses().map((ip) => `http://${ip}:${port}/player/`),
+    adminUrls: lanAddresses().map((ip) => `http://${ip}:${port}/admin/`),
+  });
+});
 app.use('/admin', express.static(path.join(pub, 'admin')));
 app.use('/player', express.static(path.join(pub, 'player'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 app.get('/shared/schedule.js', (req, res) => res.sendFile(path.join(__dirname, '..', 'shared', 'schedule.js')));
