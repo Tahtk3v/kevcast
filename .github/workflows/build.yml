@@ -1,5 +1,9 @@
-# Runs the server tests and builds the desktop installers on every OS.
-# Download the installers from the run's "Artifacts" section on GitHub.
+# Runs the tests and builds every installer on Windows, macOS and Linux.
+# Download them from the run's "Artifacts" section on GitHub:
+#   KevCast-Windows : KevCast-Setup (choose Server/Player/Studio), KevCast-Server-Setup,
+#                     KevCast Player and KevCast Studio (.exe and .msi)
+#   KevCast-macOS   : KevCast-Server .pkg, KevCast Player and KevCast Studio .dmg
+#   KevCast-Linux   : kevcast-server .deb, KevCast Player and KevCast Studio (.deb, .AppImage), x64 + arm64
 name: Build
 
 on:
@@ -13,42 +17,69 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - run: npm ci
       - run: npm test
 
-  desktop:
+  installers:
     needs: test
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: macOS
+          - os: ubuntu-latest
+            name: Linux
     runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: desktop
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: false # unsigned builds; add signing certificates for production
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - run: npm ci
+
       - name: Build KevCast Player and KevCast Studio
+        working-directory: desktop
         run: |
+          npm ci
           npx electron-builder --config electron-builder.player.yml --publish never
           npx electron-builder --config electron-builder.studio.yml --publish never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false # unsigned builds; add signing certificates for production
-      - uses: actions/upload-artifact@v4
+
+      - name: Build Windows installers (KevCast Setup + KevCast Server Setup)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./packaging/windows/build.ps1
+
+      - name: Build KevCast Server .deb (amd64 + arm64)
+        if: runner.os == 'Linux'
+        run: |
+          bash packaging/linux/build-deb.sh amd64
+          bash packaging/linux/build-deb.sh arm64
+
+      - name: Build KevCast Server .pkg (Apple silicon + Intel)
+        if: runner.os == 'macOS'
+        run: |
+          bash packaging/macos/build-pkg.sh arm64
+          bash packaging/macos/build-pkg.sh x64
+
+      - uses: actions/upload-artifact@v5
         with:
-          name: kevcast-desktop-${{ matrix.os }}
+          name: KevCast-${{ matrix.name }}
           path: |
+            packaging-out/*.exe
+            packaging-out/*.deb
+            packaging-out/*.pkg
             desktop/dist/*/*.exe
             desktop/dist/*/*.msi
             desktop/dist/*/*.dmg
             desktop/dist/*/*.AppImage
             desktop/dist/*/*.deb
-          if-no-files-found: warn
+          if-no-files-found: error

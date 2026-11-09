@@ -1,4 +1,7 @@
-# Server installers
+# Server install scripts
+
+> Most people should use the **installers** instead (KevCast Setup for Windows, or the server `.deb` or `.pkg`). See [docs/installation.md](../docs/installation.md#installers-recommended).
+> These scripts install the server from a git checkout, using the system's Node.js.
 
 | OS | Run | Installs to | Data |
 |---|---|---|---|

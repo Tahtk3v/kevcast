@@ -5,6 +5,52 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-09
+### Security
+- **Electron 38.8.6 → 42.11.18** for KevCast Player and KevCast Studio. This fixes [GHSA-jr5w-w6x2-84p9](https://github.com/electron/electron/security/advisories/GHSA-jr5w-w6x2-84p9), the mitigation for compromised eMudhra intermediate certificates, and includes later Chromium and V8 security backports. (Reported by Dependabot in #3.)
+- Build tooling: `minimatch` ≥ 11.0.1 for [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249), through an npm override. electron-builder is updated to 26.18.0. `npm audit` reports 0 vulnerabilities for the server and the desktop apps.
+
+### Added
+- **Separate installers** for the Server, Player and Studio.
+  - The server installers bundle their own Node.js runtime:
+    - Windows `KevCast-Server-Setup.exe` (with Poppler included)
+    - Linux `kevcast-server` `.deb` (amd64 and arm64)
+    - macOS `.pkg`
+  - **KevCast Setup** for Windows lets you choose Server (with optional LibreOffice), Player and/or Studio.
+- Installing the server adds a **KevCast Web Studio** desktop and menu shortcut.
+- **Start page** at the server address with a link to the Web Studio and the exact page browser-based screens must open. It is also shown on the Displays page and by the installers.
+- App icons for KevCast Player, KevCast Studio and the server.
+
+- **Web pages in the schedule.** Schedule a web page (or any single item) directly, without a playlist. Create one inline with **+ New web page…**. Web pages get **zoom** and **auto-reload** settings, plus a preview.
+- The **KevCast Player app** shows web pages that normally refuse to be embedded (`X-Frame-Options`, CSP `frame-ancestors`), such as departure boards and traffic info.
+- **Richer scheduling**:
+  - repeat weekly (every 1–4 weeks), monthly (on a day of the month) or once
+  - a validity period (*valid from / until*)
+  - **repeat within a time window** ("every 15 minutes, show for 60 seconds"), which interrupts the normal content
+  - **seconds per item** for each scheduled entry
+- **Week overview**: one row per day showing exactly what a screen plays, including its default playlist and recurring items.
+- **Weekly restart** of Player app screens (default Sunday 03:00, configurable per display). Windows restarts the computer so updates install. `rebootCommand` and `weeklyRestart` are available in `player.json`.
+- Screenshots throughout the documentation and the README.
+- **Display groups**:
+  - A Groups page: create, colour, rename and delete groups, and add or remove screens.
+  - Each group has its own page showing its screens, a week overview and its schedule entries.
+  - Group actions: Schedule for this group, Send to group, Set default playlist, Identify, Reload, and **Copy schedule to…** other groups.
+  - A screen can be in **several groups**. Existing single-group data is migrated automatically.
+- **Displays page**: select several screens, then *Add to group / Remove from group / Set default playlist / Send / Schedule*. Filter by group.
+- **Schedule tables**: select several entries, then *Enable / Disable / Change screens / Priority / Remove*. The schedule views can filter on a whole group.
+- **KevCast Studio, This computer**: browse quick folders (Desktop, Documents, Downloads, OneDrive, drives, recent folders), see which files are already uploaded, and upload with progress. Includes a native **Browse…** dialog. Uploads stream from disk.
+- Dependabot configuration for npm (server and desktop) and GitHub Actions.
+- **File → Upload files…** (Ctrl/Cmd+U) in Studio. A playlist's **Upload** button adds the uploaded files to that playlist.
+
+### Changed
+- Players check the schedule every 5 seconds (was 15), and resume a playlist where it left off after an interruption.
+- A single web page that stays on screen is no longer reloaded each time its duration ends.
+
+### Fixed
+- Removing a display (or group) that was the only target of a schedule entry turned that entry into "all displays". Such entries are now removed.
+- The Windows MSI build failed because no application icon was set.
+- Web pages appeared only after an 8-second delay on players.
+
 ## [0.1.0] - 2026-11-09
 ### Added
 - **Server** for Windows, macOS and Linux with one-step installers. There is no database server and no Docker.

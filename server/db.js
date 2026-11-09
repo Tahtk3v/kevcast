@@ -11,6 +11,7 @@ const EMPTY = () => ({
   playlists: [],
   displays: [],
   schedules: [],
+  groups: [],
 });
 
 class Database {

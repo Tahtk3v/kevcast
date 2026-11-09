@@ -4,6 +4,7 @@ productName: KevCast Studio
 artifactName: KevCast-Studio-${version}-${os}-${arch}.${ext}
 directories:
   output: dist/studio
+  buildResources: build
 extraMetadata:
   name: kevcast-studio
   main: studio/main.js
@@ -12,6 +13,7 @@ files:
   - common/**
   - studio/**
 win:
+  icon: build/studio.ico
   target:
     - target: nsis
       arch: [x64]
@@ -26,11 +28,13 @@ msi:
   perMachine: true
   runAfterFinish: true
 mac:
+  icon: build/studio.png
   category: public.app-category.productivity
   target:
     - target: dmg
       arch: [x64, arm64]
 linux:
+  icon: build/studio.png
   category: Utility
   target:
     - target: AppImage

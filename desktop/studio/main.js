@@ -6,6 +6,7 @@ const path = require('path');
 const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
 const { createConfig } = require('../common/config');
 const { openConnectWindow } = require('../common/connect-window');
+const { registerLocalFiles } = require('./local-files');
 
 app.setName('KevCast Studio');
 app.setPath('userData', path.join(app.getPath('appData'), 'KevCast Studio'));
@@ -44,7 +45,7 @@ function createMainWindow() {
     minHeight: 600,
     title: 'KevCast Studio',
     backgroundColor: '#f4f5fb',
-    webPreferences: { contextIsolation: true, sandbox: true, spellcheck: true },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, spellcheck: true },
   });
   if (cfg.maximized) win.maximize();
   win.webContents.setUserAgent(`${win.webContents.getUserAgent().replace(/ KevCastStudio\/\S+/, "")} KevCastStudio/${require('../package.json').version}`);
@@ -87,6 +88,14 @@ function createMainWindow() {
   buildMenu();
 }
 
+/** File → Upload files…: open the Media page and the system's file picker. */
+function uploadFromMenu() {
+  if (!win) return;
+  win.webContents.executeJavaScript(
+    "location.hash = '#/media'; setTimeout(() => window.__kevcastPickFiles && window.__kevcastPickFiles(), 300);"
+  ).catch(() => {});
+}
+
 function go(hash) {
   if (win) win.loadURL(`${base()}/admin/#/${hash}`);
 }
@@ -102,7 +111,7 @@ function buildMenu() {
     {
       label: 'File',
       submenu: [
-        { label: 'Upload media…', accelerator: 'CmdOrCtrl+U', click: () => go('media') },
+        { label: 'Upload files…', accelerator: 'CmdOrCtrl+U', click: () => uploadFromMenu() },
         { label: 'New playlist', accelerator: 'CmdOrCtrl+N', click: () => go('playlists') },
         { type: 'separator' },
         { label: 'Connect to another server…', click: showConnect },
@@ -120,7 +129,8 @@ function buildMenu() {
         { label: 'Media', accelerator: 'CmdOrCtrl+2', click: () => go('media') },
         { label: 'Playlists', accelerator: 'CmdOrCtrl+3', click: () => go('playlists') },
         { label: 'Schedule', accelerator: 'CmdOrCtrl+4', click: () => go('schedule') },
-        { label: 'Displays & groups', accelerator: 'CmdOrCtrl+5', click: () => go('displays') },
+        { label: 'Displays', accelerator: 'CmdOrCtrl+5', click: () => go('displays') },
+        { label: 'Groups', accelerator: 'CmdOrCtrl+6', click: () => go('groups') },
         { label: 'Settings', accelerator: 'CmdOrCtrl+,', click: () => go('settings') },
       ],
     },
@@ -156,6 +166,8 @@ function showConnect() {
     onClosed: () => { if (!win) app.quit(); },
   });
 }
+
+registerLocalFiles({ getServer: () => cfg.server, getWindow: () => win, config });
 
 app.whenReady().then(() => {
   if (cfg.server) createMainWindow();

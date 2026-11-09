@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('kevcastNative', {
   /** { total, cached, bytes, downloading, offline, lastSync } of the local media cache. */
   cacheStatus: () => ipcRenderer.invoke('player:cache-status'),
   onCacheStatus: (fn) => ipcRenderer.on('player:cache-status', (e, status) => fn(status)),
+  /** Weekly restart settings from the Web Studio: { weeklyRestart, day, time }. */
+  setMaintenance: (m) => ipcRenderer.send('player:maintenance', m),
   retry: () => ipcRenderer.send('player:retry'),
   changeServer: () => ipcRenderer.send('player:change-server'),
 });

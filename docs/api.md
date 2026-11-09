@@ -42,10 +42,11 @@ curl -b kc.txt http://server:8080/api/displays
 |---|---|---|---|
 | GET | `/api/media` | – | List. Each item adds `url`, `slideUrls`, `thumb`. |
 | POST | `/api/media/upload` | `multipart/form-data`, field `files` (up to 50 files) | `{ created: [...], rejected: [names] }` |
-| POST | `/api/media` | `{ type: 'web', url, name? }` or `{ type: 'text', text: { title, body, bg, bg2, fg, align, size }, name? }` | The media item |
-| PATCH | `/api/media/:id` | `{ name?, url?, text?, tags? }` | The media item |
+| POST | `/api/media` | `{ type: 'web', url, name?, zoom?, refreshSeconds? }` or `{ type: 'text', text: { title, body, bg, bg2, fg, align, size }, name? }` | The media item |
+| PATCH | `/api/media/:id` | `{ name?, url?, text?, tags?, zoom?, refreshSeconds? }` | The media item |
+| GET | `/api/media/:id/preview` | – | The item as players receive it (used by `/player/?preview=media:<id>`) |
 | POST | `/api/media/:id/reconvert` | – | Converts a presentation again |
-| DELETE | `/api/media/:id` | – | Also removes it from all playlists |
+| DELETE | `/api/media/:id` | – | Also removes it from all playlists and deletes schedule entries that play it |
 
 Presentations start with `status: "processing"` and become `"ready"` or `"error"` (with `error`).
 
@@ -76,22 +77,37 @@ An item looks like `{ mediaId, duration, transition?, enabled?, mute? }`:
 | POST | `/api/schedules` | entry | The entry |
 | PUT | `/api/schedules/:id` | entry | The entry |
 | DELETE | `/api/schedules/:id` | – | `{ ok }` |
+| POST | `/api/schedules/bulk` | `{ ids: [], action: 'enable'\|'disable'\|'delete'\|'setTargets'\|'priority', targets?, priority? }` | `{ changed }` |
 
 ```json
 {
-  "name": "Lunch menu",
-  "playlistId": "a1b2c3",
+  "name": "Train departures",
+  "playlistId": null,
+  "mediaId": "d4e5f6",
+  "itemDuration": 60,
   "enabled": true,
   "priority": 0,
-  "allDay": false,
-  "start": "11:30",
-  "end": "13:30",
+  "repeat": "weekly",
   "days": [1, 2, 3, 4, 5],
-  "startDate": null,
-  "endDate": null,
-  "targets": { "displays": [], "groups": ["Canteen"] }
+  "everyWeeks": 1,
+  "monthDay": 1,
+  "allDay": false,
+  "start": "07:00",
+  "end": "09:30",
+  "interval": { "everyMinutes": 15, "showSeconds": 60 },
+  "startDate": "2026-11-01",
+  "endDate": "2026-12-31",
+  "targets": { "displays": [], "groups": ["Lobby"] }
 }
 ```
+- **What plays**: `playlistId`, or `mediaId` for a single item such as a web page.
+- `itemDuration`: seconds per item. `0` = the item's own time.
+- `repeat`:
+  - `weekly`: uses `days` and `everyWeeks`. Weeks are counted from `startDate`, or from the creation date.
+  - `monthly`: uses `monthDay`.
+  - `once`: uses `startDate` as the only date.
+- `interval` (optional): show the content for `showSeconds` every `everyMinutes` within the time window, counted from its start.
+- `startDate` / `endDate`: the period in which the entry is valid.
 - `days`: 0 = Sunday … 6 = Saturday. An empty list means every day.
 - `priority`: 0 normal, 5 high, 10 urgent.
 - Empty `targets` means all displays.
@@ -102,13 +118,13 @@ An item looks like `{ mediaId, duration, transition?, enabled?, mute? }`:
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | GET | `/api/displays` | – | List with `online`, `scheduledPlaylistId`, `scheduleId`, `nowPlaying`, `cache`, `screenshotAt` (tokens are never returned) |
-| POST | `/api/displays/pair` | `{ code, name?, group?, defaultPlaylistId? }` | The approved display |
-| PATCH | `/api/displays/:id` | Any of `{ name, group, defaultPlaylistId, orientation, fit, showClock, ticker, background, notes }` | The display |
-| PATCH | `/api/displays/bulk` | `{ ids?: [], group?: "name", all?: true, patch: { group, defaultPlaylistId, orientation, fit, showClock, ticker, background } }` | `{ updated }` |
+| POST | `/api/displays/pair` | `{ code, name?, groups?: [], defaultPlaylistId? }` | The approved display |
+| PATCH | `/api/displays/:id` | Any of `{ name, groups, defaultPlaylistId, orientation, fit, showClock, ticker, background, notes, maintenance }` | The display |
+| PATCH | `/api/displays/bulk` | `{ ids?: [], group?: "name", all?: true, addGroups?: [], removeGroups?: [], patch: { groups, defaultPlaylistId, orientation, fit, showClock, ticker, background, maintenance } }` | `{ updated }` |
 | POST | `/api/displays/:id/identify` · `/reload` · `/screenshot` | – | `{ delivered }`: 1 if the screen is online |
 | POST | `/api/displays/command` | `{ action: 'identify'\|'reload'\|'screenshot', ids?, group?, all? }` | `{ targeted, delivered }` |
 | GET | `/api/displays/:id/screenshot` | – | Latest JPEG screenshot (404 if none) |
-| DELETE | `/api/displays/:id` | – | Unpairs the screen (it shows a new code) |
+| DELETE | `/api/displays/:id` | – | Unpairs the screen (it shows a new code). Entries aimed only at this screen are removed: `{ removedSchedules }`. |
 
 Example: update the news ticker on every screen in a group.
 ```bash
@@ -117,24 +133,41 @@ curl -b kc.txt -X PATCH -H 'Content-Type: application/json' \
   http://server:8080/api/displays/bulk
 ```
 
+## Groups (admin)
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| GET | `/api/groups` | – | `[{ id, name, color, description, displayIds, members, online, schedules }]` |
+| POST | `/api/groups` | `{ name, color?, description?, displayIds? }` | The group (409 if the name exists) |
+| PATCH | `/api/groups/:id` | `{ name?, color?, description? }` | The group. Renaming updates the members and schedule entries. |
+| POST | `/api/groups/:id/members` | `{ add?: [displayId], remove?: [displayId] }` | The group |
+| POST | `/api/groups/:id/copy-schedule` | `{ toGroupIds: [id] }` | `{ copied }`: copies of all entries aimed at this group |
+| DELETE | `/api/groups/:id` | – | `{ removedSchedules }`. Members leave the group; entries aimed only at it are deleted. |
+
+A display can be in several groups: `display.groups` is an array of names. Schedule entries target groups by name.
+
 ## Player API (display token)
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | POST | `/api/player/register` | `{ resolution?, userAgent?, provisioning?: { key, name, group, playlist } }` | `{ id, token, pairingCode, approved }`. No token needed. |
 | GET | `/api/player/manifest` | – | `{ display, schedules, playlists, orgName, serverVersion, generatedAt }` |
+| GET | `/api/info` | – | Public: `{ orgName, version, playerUrls, adminUrls }` (used by the start page) |
 | POST | `/api/player/heartbeat` | `{ nowPlaying?, resolution?, cache? }` | `{ ok, approved }` |
 | POST | `/api/player/screenshot` | JPEG bytes, `Content-Type: image/jpeg`, max 5 MB | `{ ok }` |
 | GET | `/api/player/events` | – | SSE: `update`, `approved`, `identify`, `reload`, `screenshot`, `unpaired` |
 
-Manifest playlists are flattened. Each item has `type` (`image`, `video`, `web`, `text`), `url` or `text`,
-`duration`, `transition`, `name`, and for presentations `slide` and `slides`.
+`maintenance` is `{ weeklyRestart: true, day: 0, time: "03:00" }` (day 0 = Sunday): the weekly restart of Player app screens.
+
+Manifest playlists are flattened. Single scheduled items appear as playlists with the key `media:<id>`. Each item has `type` (`image`, `video`, `web`, `text`), `url` or `text`,
+`duration`, `transition`, `name`, for presentations `slide` and `slides`, and for web pages `zoom` and `refreshSeconds`.
 
 ## Static paths
 
 | Path | Content |
 |---|---|
 | `/admin/` | Admin app |
-| `/player/` | Player app (`?reset=1` forgets the pairing, `?preview=<playlistId>` previews a playlist) |
+| `/` | Start page: link to the Web Studio and the address for browser players |
+| `/player/` | Player app (`?reset=1` forgets the pairing, `?preview=<playlistId>` or `?preview=media:<id>` previews) |
 | `/media/<id>/<file>` | Media and slides (immutable, cached for 7 days) |
 | `/shared/schedule.js` | Schedule logic used by the admin and player |

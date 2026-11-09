@@ -28,6 +28,54 @@ fs.mkdirSync(UPLOAD_TMP, { recursive: true });
 fs.mkdirSync(SHOTS_DIR, { recursive: true });
 
 const db = new Database(DATA_DIR);
+
+// ---------------------------------------------------------------------------
+// Display groups. A display can belong to several groups (display.groups = [name]);
+// schedules target groups by name. Groups also exist on their own (empty groups,
+// colour, description), so they can be prepared before screens are added.
+// ---------------------------------------------------------------------------
+const GROUP_COLORS = ['#0891b2', '#16a34a', '#ea580c', '#db2777', '#7c3aed', '#ca8a04', '#4f46e5', '#dc2626'];
+function groupNames() {
+  return db.list('groups').map((g) => g.name);
+}
+/** Make sure groups with these names exist (creates missing ones). Returns the cleaned names. */
+function ensureGroups(names) {
+  const clean = [...new Set((names || []).map((n) => String(n).trim()).filter(Boolean))];
+  for (const name of clean) {
+    if (!db.list('groups').some((g) => g.name.toLowerCase() === name.toLowerCase())) {
+      db.insert('groups', { name, color: GROUP_COLORS[db.list('groups').length % GROUP_COLORS.length], description: '' });
+    }
+  }
+  // Use the stored spelling.
+  return clean.map((n) => db.list('groups').find((g) => g.name.toLowerCase() === n.toLowerCase()).name);
+}
+/** Remove targets from schedule entries; entries left with no target at all are deleted, not widened to "all". */
+function pruneScheduleTargets({ displayId, group }) {
+  let removed = 0;
+  db.data.schedules = db.list('schedules').filter((s) => {
+    const t = s.targets || { displays: [], groups: [] };
+    const before = t.displays.length + t.groups.length;
+    if (displayId) t.displays = t.displays.filter((x) => x !== displayId);
+    if (group) t.groups = t.groups.filter((x) => x !== group);
+    if (before > 0 && t.displays.length + t.groups.length === 0) { removed++; return false; }
+    return true;
+  });
+  return removed;
+}
+(function migrateGroups() {
+  let changed = false;
+  for (const d of db.list('displays')) {
+    if (!Array.isArray(d.groups)) {
+      d.groups = d.group ? [d.group] : [];
+      delete d.group;
+      changed = true;
+    }
+  }
+  const used = [...db.list('displays').flatMap((d) => d.groups), ...db.list('schedules').flatMap((s) => s.targets?.groups || [])];
+  const before = db.list('groups').length;
+  ensureGroups(used);
+  if (changed || db.list('groups').length !== before) db.saveNow();
+})();
 const auth = createAuth(db, DATA_DIR);
 const app = express();
 app.disable('x-powered-by');
@@ -107,7 +155,7 @@ function isOnline(d) {
 function publicDisplay(d) {
   const { token, ...rest } = d;
   const now = resolveSchedule(db.list('schedules'), d, new Date());
-  return { ...rest, online: isOnline(d), scheduledPlaylistId: now.playlistId, scheduleId: now.scheduleId };
+  return { ...rest, maintenance: maintenanceOf(d), online: isOnline(d), scheduledPlaylistId: now.playlistId, scheduledMediaId: now.mediaId, scheduleId: now.scheduleId };
 }
 
 function detectType(filename, mimetype) {
@@ -143,36 +191,55 @@ function processPresentation(m) {
     });
 }
 
+/** One media item → the entries a player shows (one per slide for presentations). */
+function expandMedia(m, it, defaults) {
+  const out = [];
+  if (!m || m.status !== 'ready') return out;
+  const base = { itemId: it.id || m.id, mediaId: m.id, name: m.name, transition: it.transition || defaults.transition || 'fade' };
+  const duration = Number(it.duration) > 0 ? Number(it.duration) : m.type === 'video' ? 0 : Number(defaults.duration) || 10;
+  if (m.type === 'presentation') {
+    (m.slides || []).forEach((s, i) => out.push({ ...base, type: 'image', url: mediaUrl(m, `slides/${s}`), duration, slide: i + 1, slides: m.slides.length }));
+  } else if (m.type === 'image') out.push({ ...base, type: 'image', url: mediaUrl(m, m.file), duration });
+  else if (m.type === 'video') out.push({ ...base, type: 'video', url: mediaUrl(m, m.file), duration, mute: it.mute !== false });
+  else if (m.type === 'web') out.push({ ...base, type: 'web', url: m.url, duration, zoom: Number(m.zoom) || 100, refreshSeconds: Number(m.refreshSeconds) || 0 });
+  else if (m.type === 'text') out.push({ ...base, type: 'text', text: m.text, duration });
+  return out;
+}
+
 /** Flatten a playlist into what a player can show: one entry per image/slide/video/page. */
 function expandPlaylist(p) {
   if (!p) return null;
   const items = [];
   for (const it of p.items || []) {
-    const m = db.get('media', it.mediaId);
-    if (!m || m.status !== 'ready') continue;
     if (it.enabled === false) continue;
-    const base = { itemId: it.id, mediaId: m.id, name: m.name, transition: it.transition || p.transition || 'fade' };
-    const duration = Number(it.duration) > 0 ? Number(it.duration) : m.type === 'video' ? 0 : Number(p.defaultDuration) || 10;
-    if (m.type === 'presentation') {
-      (m.slides || []).forEach((s, i) => items.push({ ...base, type: 'image', url: mediaUrl(m, `slides/${s}`), duration, slide: i + 1, slides: m.slides.length }));
-    } else if (m.type === 'image') items.push({ ...base, type: 'image', url: mediaUrl(m, m.file), duration });
-    else if (m.type === 'video') items.push({ ...base, type: 'video', url: mediaUrl(m, m.file), duration, mute: it.mute !== false });
-    else if (m.type === 'web') items.push({ ...base, type: 'web', url: m.url, duration });
-    else if (m.type === 'text') items.push({ ...base, type: 'text', text: m.text, duration });
+    items.push(...expandMedia(db.get('media', it.mediaId), it, { transition: p.transition, duration: p.defaultDuration }));
   }
   return { id: p.id, name: p.name, items };
 }
 
+/** A single scheduled media item (e.g. a web page) as a one-item "playlist" keyed "media:<id>". */
+function expandSingle(mediaId) {
+  const m = db.get('media', mediaId);
+  if (!m) return null;
+  return { id: `media:${m.id}`, name: m.name, items: expandMedia(m, { id: m.id }, { transition: 'fade', duration: 30 }) };
+}
+
 function playerManifest(d) {
   const schedules = db.list('schedules').filter((s) => s.enabled !== false);
-  const ids = new Set(schedules.map((s) => s.playlistId));
+  const ids = new Set(schedules.filter((s) => s.playlistId).map((s) => s.playlistId));
   if (d.defaultPlaylistId) ids.add(d.defaultPlaylistId);
   const playlists = {};
   for (const id of ids) {
     const p = expandPlaylist(db.get('playlists', id));
     if (p) playlists[id] = p;
   }
+  for (const s of schedules) {
+    if (!s.mediaId || playlists[`media:${s.mediaId}`]) continue;
+    const p = expandSingle(s.mediaId);
+    if (p) playlists[p.id] = p;
+  }
   const { token, ...display } = d;
+  display.maintenance = maintenanceOf(d);
   return {
     serverVersion: pkg.version,
     orgName: db.data.settings.orgName,
@@ -187,7 +254,17 @@ function playerManifest(d) {
 // Static files
 // ---------------------------------------------------------------------------
 const pub = path.join(__dirname, '..', 'public');
-app.get('/', (req, res) => res.redirect('/admin/'));
+// Start page: shows where to manage KevCast and which page screens should open.
+app.get('/', (req, res) => res.sendFile(path.join(pub, 'index.html')));
+app.get('/api/info', (req, res) => {
+  const port = req.socket.localPort || PORT;
+  res.json({
+    orgName: db.data.settings.orgName,
+    version: pkg.version,
+    playerUrls: lanAddresses().map((ip) => `http://${ip}:${port}/player/`),
+    adminUrls: lanAddresses().map((ip) => `http://${ip}:${port}/admin/`),
+  });
+});
 app.use('/admin', express.static(path.join(pub, 'admin')));
 app.use('/player', express.static(path.join(pub, 'player'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 app.get('/shared/schedule.js', (req, res) => res.sendFile(path.join(__dirname, '..', 'shared', 'schedule.js')));
@@ -285,13 +362,14 @@ app.post('/api/player/register', (req, res) => {
     approved: auto,
     pairingCode: auto ? null : pairingCode(),
     token: crypto.randomBytes(24).toString('hex'),
-    group: (auto && provisioning.group) || '',
+    groups: auto && provisioning.group ? ensureGroups([provisioning.group]) : [],
     defaultPlaylistId: null,
     orientation: 'landscape',
     fit: 'contain',
     showClock: false,
     ticker: { enabled: false, text: '', speed: 60 },
     background: '#000000',
+    maintenance: { ...DEFAULT_MAINTENANCE },
     resolution: resolution || null,
     userAgent: userAgent || req.get('user-agent'),
     ip: req.ip,
@@ -419,10 +497,10 @@ admin.post('/media/upload', upload.array('files', 50), (req, res) => {
 });
 
 admin.post('/media', (req, res) => {
-  const { type, name, url, text } = req.body || {};
+  const { type, name, url, text, zoom, refreshSeconds } = req.body || {};
   if (type === 'web') {
     if (!/^https?:\/\//i.test(url || '')) return bad(res, 'Enter a full web address starting with http:// or https://');
-    return res.json(publicMedia(db.insert('media', { type, name: name || url, url, status: 'ready', tags: [] })));
+    return res.json(publicMedia(db.insert('media', { type, name: name || url, url, zoom: cleanZoom(zoom), refreshSeconds: Math.max(0, Number(refreshSeconds) || 0), status: 'ready', tags: [] })));
   }
   if (type === 'text') {
     if (!text || !(text.title || text.body)) return bad(res, 'Add a title or some text');
@@ -431,12 +509,22 @@ admin.post('/media', (req, res) => {
   bad(res, 'Unknown media type');
 });
 
+const cleanZoom = (z) => Math.max(25, Math.min(400, Math.round(Number(z) || 100)));
 admin.patch('/media/:id', (req, res) => {
-  const allowed = ['name', 'url', 'text', 'tags'];
+  const allowed = ['name', 'url', 'text', 'tags', 'zoom', 'refreshSeconds'];
   const patch = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
+  if ('url' in patch && !/^https?:\/\//i.test(patch.url || '')) return bad(res, 'Enter a full web address starting with http:// or https://');
+  if ('zoom' in patch) patch.zoom = cleanZoom(patch.zoom);
+  if ('refreshSeconds' in patch) patch.refreshSeconds = Math.max(0, Number(patch.refreshSeconds) || 0);
   const m = db.update('media', req.params.id, patch);
   if (!m) return bad(res, 'Not found', 404);
   res.json(publicMedia(m));
+});
+
+admin.get('/media/:id/preview', (req, res) => {
+  const p = expandSingle(req.params.id);
+  if (!p) return bad(res, 'Not found', 404);
+  res.json(p);
 });
 
 admin.post('/media/:id/reconvert', (req, res) => {
@@ -450,6 +538,7 @@ admin.delete('/media/:id', (req, res) => {
   const id = req.params.id;
   if (!db.remove('media', id)) return bad(res, 'Not found', 404);
   for (const p of db.list('playlists')) p.items = (p.items || []).filter((i) => i.mediaId !== id);
+  db.data.schedules = db.list('schedules').filter((x) => x.mediaId !== id);
   db.save('playlists');
   fs.rmSync(path.join(MEDIA_DIR, id), { recursive: true, force: true });
   res.json({ ok: true });
@@ -516,35 +605,65 @@ admin.get('/playlists/:id/preview', (req, res) => {
 });
 
 // Schedules -------------------------------------------------------------------
+const DEFAULT_MAINTENANCE = { weeklyRestart: true, day: 0, time: '03:00' };
+/** Weekly restart settings of a display (older displays get the default: Sunday 03:00). */
+function maintenanceOf(d) {
+  const m = d.maintenance || {};
+  return {
+    weeklyRestart: m.weeklyRestart !== undefined ? !!m.weeklyRestart : DEFAULT_MAINTENANCE.weeklyRestart,
+    day: Number.isInteger(m.day) && m.day >= 0 && m.day <= 6 ? m.day : DEFAULT_MAINTENANCE.day,
+    time: /^\d{2}:\d{2}$/.test(m.time || '') ? m.time : DEFAULT_MAINTENANCE.time,
+  };
+}
+
 function cleanSchedule(b) {
   const time = (t, def) => (/^\d{1,2}:\d{2}$/.test(t || '') ? t.padStart(5, '0') : def);
   const date = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d || '') ? d : null);
+  const int = (v, min, max, def) => Math.max(min, Math.min(max, Math.round(Number(v)) || def));
+  const repeat = ['weekly', 'monthly', 'once'].includes(b.repeat) ? b.repeat : 'weekly';
+  const iv = b.interval && Number(b.interval.everyMinutes) > 0 && Number(b.interval.showSeconds) > 0
+    ? { everyMinutes: int(b.interval.everyMinutes, 1, 1440, 15), showSeconds: int(b.interval.showSeconds, 5, 86400, 60) }
+    : null;
   return {
     name: String(b.name || ''),
-    playlistId: String(b.playlistId || ''),
+    playlistId: b.mediaId ? null : String(b.playlistId || ''),
+    mediaId: b.mediaId ? String(b.mediaId) : null,
+    itemDuration: Math.max(0, Math.round(Number(b.itemDuration) || 0)),
     enabled: b.enabled !== false,
     priority: Math.max(0, Math.min(10, Number(b.priority) || 0)),
+    repeat,
+    everyWeeks: int(b.everyWeeks, 1, 52, 1),
+    monthDay: int(b.monthDay, 1, 31, 1),
     allDay: !!b.allDay,
     start: time(b.start, '08:00'),
     end: time(b.end, '17:00'),
     days: (Array.isArray(b.days) ? b.days : []).map(Number).filter((d) => d >= 0 && d <= 6),
     startDate: date(b.startDate),
-    endDate: date(b.endDate),
+    endDate: repeat === 'once' ? date(b.startDate) : date(b.endDate),
+    interval: iv,
     targets: {
       displays: (b.targets?.displays || []).map(String),
-      groups: (b.targets?.groups || []).map(String),
+      groups: ensureGroups(b.targets?.groups || []),
     },
   };
+}
+function scheduleProblem(s) {
+  if (s.mediaId ? !db.get('media', s.mediaId) : !db.get('playlists', s.playlistId)) return 'Pick a playlist, media item or web page';
+  if (s.repeat === 'once' && !s.startDate) return 'Pick the date';
+  if (s.startDate && s.endDate && s.endDate < s.startDate) return 'The end date is before the start date';
+  return null;
 }
 admin.get('/schedules', (req, res) => res.json(db.list('schedules')));
 admin.post('/schedules', (req, res) => {
   const s = cleanSchedule(req.body || {});
-  if (!db.get('playlists', s.playlistId)) return bad(res, 'Pick a playlist');
+  const problem = scheduleProblem(s);
+  if (problem) return bad(res, problem);
   res.json(db.insert('schedules', s));
 });
 admin.put('/schedules/:id', (req, res) => {
   const s = cleanSchedule(req.body || {});
-  if (!db.get('playlists', s.playlistId)) return bad(res, 'Pick a playlist');
+  const problem = scheduleProblem(s);
+  if (problem) return bad(res, problem);
   const out = db.update('schedules', req.params.id, s);
   if (!out) return bad(res, 'Not found', 404);
   res.json(out);
@@ -561,12 +680,12 @@ admin.post('/displays/pair', (req, res) => {
   const code = String(req.body?.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const d = db.list('displays').find((x) => !x.approved && x.pairingCode === code);
   if (!d) return bad(res, 'No screen is showing that code. Check the code on the screen and try again.', 404);
-  const { name, group, defaultPlaylistId } = req.body;
+  const { name, group, groups, defaultPlaylistId } = req.body;
   db.update('displays', d.id, {
     approved: true,
     pairingCode: null,
     name: name || `Display ${db.list('displays').filter((x) => x.approved).length + 1}`,
-    group: group || '',
+    groups: ensureGroups(Array.isArray(groups) ? groups : group ? [group] : []),
     defaultPlaylistId: defaultPlaylistId || null,
   });
   toPlayer(d.id, 'approved', {});
@@ -575,7 +694,7 @@ admin.post('/displays/pair', (req, res) => {
 
 // Commands and settings for many displays at once (a group, a selection or all).
 function selectDisplays({ ids, group, all }) {
-  return db.list('displays').filter((d) => d.approved && (all || (ids || []).includes(d.id) || (group && d.group === group)));
+  return db.list('displays').filter((d) => d.approved && (all || (ids || []).includes(d.id) || (group && (d.groups || []).includes(group))));
 }
 admin.post('/displays/command', (req, res) => {
   const { action } = req.body || {};
@@ -589,10 +708,17 @@ admin.post('/displays/command', (req, res) => {
   res.json({ ok: true, targeted: list.length, delivered });
 });
 admin.patch('/displays/bulk', (req, res) => {
-  const allowed = ['group', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'ticker', 'background'];
+  const allowed = ['groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'ticker', 'background', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body?.patch || {}).filter(([k]) => allowed.includes(k)));
+  if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
+  if (patch.groups) patch.groups = ensureGroups(patch.groups);
+  const add = ensureGroups(req.body?.addGroups || []);
+  const remove = (req.body?.removeGroups || []).map(String);
   const list = selectDisplays(req.body || {});
-  for (const d of list) Object.assign(d, patch, { updatedAt: new Date().toISOString() });
+  for (const d of list) {
+    Object.assign(d, patch, { updatedAt: new Date().toISOString() });
+    if (add.length || remove.length) d.groups = [...new Set([...(d.groups || []), ...add])].filter((g) => !remove.includes(g));
+  }
   db.save('displays');
   res.json({ ok: true, updated: list.length });
 });
@@ -604,8 +730,10 @@ admin.get('/displays/:id/screenshot', (req, res) => {
 });
 
 admin.patch('/displays/:id', (req, res) => {
-  const allowed = ['name', 'group', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'ticker', 'background', 'notes'];
+  const allowed = ['name', 'groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'ticker', 'background', 'notes', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
+  if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
+  if (patch.groups) patch.groups = ensureGroups(Array.isArray(patch.groups) ? patch.groups : []);
   const d = db.update('displays', req.params.id, patch);
   if (!d) return bad(res, 'Not found', 404);
   res.json(publicDisplay(d));
@@ -624,9 +752,114 @@ admin.delete('/displays/:id', (req, res) => {
   toPlayer(id, 'unpaired', {});
   if (!db.remove('displays', id)) return bad(res, 'Not found', 404);
   fs.rmSync(path.join(SHOTS_DIR, `${id}.jpg`), { force: true });
-  for (const s of db.list('schedules')) s.targets.displays = s.targets.displays.filter((x) => x !== id);
+  const removedSchedules = pruneScheduleTargets({ displayId: id });
   db.save('schedules');
-  res.json({ ok: true });
+  res.json({ ok: true, removedSchedules });
+});
+
+// Groups ----------------------------------------------------------------------
+function publicGroup(g) {
+  const members = db.list('displays').filter((d) => d.approved && (d.groups || []).includes(g.name));
+  return {
+    ...g,
+    displayIds: members.map((d) => d.id),
+    members: members.length,
+    online: members.filter(isOnline).length,
+    schedules: db.list('schedules').filter((s) => (s.targets?.groups || []).includes(g.name)).length,
+  };
+}
+admin.get('/groups', (req, res) => res.json(db.list('groups').map(publicGroup)));
+admin.post('/groups', (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  if (!name) return bad(res, 'Give the group a name');
+  if (groupNames().some((n) => n.toLowerCase() === name.toLowerCase())) return bad(res, 'A group with that name already exists', 409);
+  const [created] = ensureGroups([name]);
+  const g = db.list('groups').find((x) => x.name === created);
+  if (req.body.color) g.color = String(req.body.color);
+  if (req.body.description) g.description = String(req.body.description);
+  if (Array.isArray(req.body.displayIds)) {
+    for (const d of db.list('displays')) if (req.body.displayIds.includes(d.id)) d.groups = [...new Set([...(d.groups || []), g.name])];
+  }
+  db.save('groups');
+  res.json(publicGroup(g));
+});
+admin.patch('/groups/:id', (req, res) => {
+  const g = db.get('groups', req.params.id);
+  if (!g) return bad(res, 'Not found', 404);
+  const b = req.body || {};
+  if (b.name !== undefined) {
+    const name = String(b.name).trim();
+    if (!name) return bad(res, 'Give the group a name');
+    if (name !== g.name && groupNames().some((n) => n.toLowerCase() === name.toLowerCase())) return bad(res, 'A group with that name already exists', 409);
+    // Renaming keeps members and schedules attached.
+    for (const d of db.list('displays')) d.groups = (d.groups || []).map((x) => (x === g.name ? name : x));
+    for (const s of db.list('schedules')) s.targets.groups = (s.targets.groups || []).map((x) => (x === g.name ? name : x));
+    g.name = name;
+  }
+  if (b.color !== undefined) g.color = String(b.color);
+  if (b.description !== undefined) g.description = String(b.description);
+  g.updatedAt = new Date().toISOString();
+  db.save('groups');
+  res.json(publicGroup(g));
+});
+admin.post('/groups/:id/members', (req, res) => {
+  const g = db.get('groups', req.params.id);
+  if (!g) return bad(res, 'Not found', 404);
+  const add = (req.body?.add || []).map(String);
+  const remove = (req.body?.remove || []).map(String);
+  for (const d of db.list('displays')) {
+    if (add.includes(d.id)) d.groups = [...new Set([...(d.groups || []), g.name])];
+    if (remove.includes(d.id)) d.groups = (d.groups || []).filter((x) => x !== g.name);
+  }
+  db.save('displays');
+  res.json(publicGroup(g));
+});
+/** Copy every schedule entry of this group to other groups (they get their own, editable copies). */
+admin.post('/groups/:id/copy-schedule', (req, res) => {
+  const g = db.get('groups', req.params.id);
+  if (!g) return bad(res, 'Not found', 404);
+  const targets = (req.body?.toGroupIds || []).map((id) => db.get('groups', id)).filter((x) => x && x.id !== g.id);
+  if (!targets.length) return bad(res, 'Pick at least one other group');
+  const source = db.list('schedules').filter((s) => (s.targets?.groups || []).includes(g.name));
+  let copied = 0;
+  for (const t of targets) {
+    for (const s of source) {
+      const { id, createdAt, updatedAt, ...rest } = s;
+      db.insert('schedules', { ...JSON.parse(JSON.stringify(rest)), targets: { displays: [], groups: [t.name] } });
+      copied++;
+    }
+  }
+  res.json({ ok: true, copied });
+});
+admin.delete('/groups/:id', (req, res) => {
+  const g = db.get('groups', req.params.id);
+  if (!g) return bad(res, 'Not found', 404);
+  for (const d of db.list('displays')) d.groups = (d.groups || []).filter((x) => x !== g.name);
+  const removedSchedules = pruneScheduleTargets({ group: g.name });
+  db.remove('groups', g.id);
+  res.json({ ok: true, removedSchedules });
+});
+
+// Change many schedule entries at once.
+admin.post('/schedules/bulk', (req, res) => {
+  const { ids, action } = req.body || {};
+  const list = db.list('schedules').filter((s) => (ids || []).includes(s.id));
+  if (!list.length) return bad(res, 'Select at least one entry');
+  if (action === 'delete') {
+    db.data.schedules = db.list('schedules').filter((s) => !ids.includes(s.id));
+  } else if (action === 'enable' || action === 'disable') {
+    for (const s of list) s.enabled = action === 'enable';
+  } else if (action === 'setTargets') {
+    const t = req.body.targets || {};
+    const targets = { displays: (t.displays || []).map(String), groups: ensureGroups(t.groups || []) };
+    for (const s of list) s.targets = JSON.parse(JSON.stringify(targets));
+  } else if (action === 'priority') {
+    for (const s of list) s.priority = Math.max(0, Math.min(10, Number(req.body.priority) || 0));
+  } else {
+    return bad(res, 'Unknown action');
+  }
+  db.save('schedules');
+  res.json({ ok: true, changed: list.length });
 });
 
 // Settings --------------------------------------------------------------------

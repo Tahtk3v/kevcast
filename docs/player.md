@@ -14,6 +14,8 @@ including the Raspberry Pi 4/5 (64-bit). A plain web browser can also act as a p
 | Survives server outage at power-on | ✅ | ⚠️ needs HTTPS |
 | Self-healing (crash/hang/nightly refresh) | ✅ | – |
 | Screenshots in the admin | ✅ | – |
+| Weekly restart (Windows updates) | ✅ | – |
+| Shows web pages that refuse to be embedded | ✅ | – (they stay blank) |
 | Zero-touch roll-out with `player.json` | ✅ | – |
 | Keeps the display awake | ✅ | Wake Lock API, if supported |
 
@@ -39,6 +41,9 @@ Download the installer for your platform from the GitHub *Build* workflow artifa
 | Linux (portable) | `KevCast-Player-x.y.z-linux-x86_64.AppImage` | `chmod +x` and run (needs `libfuse2`) |
 
 ## First start
+
+![Pairing screen](images/player-pairing.png)
+
 
 1. Start KevCast Player. It searches the network for KevCast servers (UDP 41234).
 2. **One server found**: the player connects automatically. **Several found**: pick one with Tab and Enter, or the mouse. **None found**: type the address, e.g. `192.168.1.20` (port 8080 is assumed) or `signage.company.com`.
@@ -78,6 +83,9 @@ Shutting down, restarting or logging off the computer always works; the player d
 
 ## Offline playback
 
+![A PowerPoint slide on a screen](images/player-slide.png)
+
+
 Every screen keeps the content it needs on its own disk:
 
 - When the schedule changes, the player downloads **every** image, slide and video that **any** schedule entry or
@@ -100,6 +108,38 @@ The admin shows the state on each display card: **Offline: Ready 24/24 files · 
 Web-page items and live data (heartbeats, screenshots) need a connection. A web-page item shows an
 error while offline; consider a short duration for those.
 
+## Weekly restart
+
+Screens that run for months need an occasional fresh start. On Windows, they also need restarts to install updates.
+Every screen with the Player app therefore restarts once a week. The default is **Sunday at 03:00**.
+
+| OS | What happens |
+|---|---|
+| **Windows** | The computer restarts, with a one-minute warning, so pending Windows updates get installed. KevCast Player starts again at sign-in. |
+| **macOS / Linux** | The player app restarts. To reboot the whole computer instead, set `rebootCommand` in [player.json](configuration.md#playerjson), e.g. `"sudo /sbin/reboot"` (needs a sudoers rule for the screen user). |
+
+- Change the day and time, or switch it off, per screen in **Displays → Settings → Weekly restart**.
+- For many screens at once, use the API: `PATCH /api/displays/bulk` with `{"group": "Lobby", "patch": {"maintenance": {...}}}` (see [API](api.md#displays-admin)).
+- The player remembers the setting, so the restart also happens while the server is unreachable.
+- It runs within 30 minutes of the planned time, at most once that day.
+- Set `"weeklyRestart": false` in `player.json` to forbid restarts on a particular device, whatever the Web Studio says.
+
+> Windows restarts are allowed for normal users on Windows 10/11 Pro and Enterprise by default. If a policy
+> blocks it, the player restarts itself instead. Make sure the screen PC signs in automatically after a restart.
+
+## Web pages
+
+Web pages in a playlist or schedule are shown full-screen, using the **zoom** and **reload** settings from the Web Studio.
+
+![A web page on a screen](images/player-webpage.png)
+
+Many sites (public transport departures, traffic maps, Microsoft and Google pages) send headers that forbid
+showing them inside another page. The Player app removes those two headers (`X-Frame-Options` and CSP
+`frame-ancestors`) for the pages inside a playlist, so they display normally. A browser player can't do that,
+so such sites stay blank there.
+
+Web pages are live, so they need a network connection. All other content keeps playing offline.
+
 ## Self-healing
 
 - If the server is unreachable at power-on and nothing is cached yet, a *Connecting…* screen appears. The player retries every 10 seconds.
@@ -115,7 +155,17 @@ Only the most recent screenshot per display is kept on the server.
 
 ## Browser players
 
-Any modern browser can be a player: open `http://<server>:8080/player/`.
+Any modern browser can be a player. **Make the browser open this page:**
+
+```
+http://<server-address>:8080/player/
+```
+
+- `<server-address>` is the IP address or name of the computer running KevCast Server, e.g. `http://192.168.1.20:8080/player/`.
+- Not sure of the address? Open `http://<server>:8080/` (the start page) on any computer, or look at **Displays → Connect another screen** in the Web Studio. Both list the exact player address with a copy button. The Windows installer also shows it on its last page.
+- Don't use `localhost` unless the browser runs on the server itself.
+- The page shows a 6-character code. Enter it in **Displays → Add display**.
+- Set this page as the browser's **start page** or kiosk URL, so the screen comes back by itself after a restart.
 
 - **Fullscreen**: press F11, double-click, or press `F` on the page. On Chrome/Edge use kiosk mode, for example:
   `msedge --kiosk http://server:8080/player/ --edge-kiosk-type=fullscreen`

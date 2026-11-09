@@ -14,7 +14,7 @@
   const previewId = qs.get('preview');
   let creds = previewId ? null : load(STORE);
   let manifest = previewId ? null : load(MANIFEST_CACHE);
-  let current = { playlistId: null, index: -1, item: null };
+  let current = { slot: null, key: null, index: -1, item: null, itemDuration: 0 };
   let timer = null;
   let activeLayer = $('layerA');
   let events = null;
@@ -81,7 +81,7 @@
     await refresh();
     setInterval(heartbeat, 30000);
     setTimeout(sendScreenshot, 20000);
-    setInterval(evaluate, 15000); // pick up schedule changes on the minute
+    setInterval(evaluate, 5000); // pick up schedule changes (and short recurring items) quickly
     heartbeat();
   }
 
@@ -101,6 +101,10 @@
     applyDisplaySettings();
     evaluate(true);
     prefetchInBrowser();
+    // The Player app performs the weekly restart (see desktop/player/main.js).
+    if (window.kevcastNative && window.kevcastNative.setMaintenance && manifest.display.maintenance) {
+      window.kevcastNative.setMaintenance(manifest.display.maintenance);
+    }
   }
 
   // Browser players: ask the service worker to download everything the schedule can show.
@@ -137,7 +141,7 @@
       method: 'POST',
       body: JSON.stringify({
         resolution: resolution(),
-        nowPlaying: it ? { playlistId: current.playlistId, name: it.name, slide: it.slide || null, slides: it.slides || null } : null,
+        nowPlaying: it ? { playlistId: current.key, name: it.name, slide: it.slide || null, slides: it.slides || null } : null,
         cache: cacheStatus,
       }),
     }).then((r) => {
@@ -206,30 +210,40 @@
   // ---------------------------------------------------------------------------
   // Scheduling + playback
   // ---------------------------------------------------------------------------
+  // `current.slot` identifies what is playing: which schedule entry (or the default) and which content.
+  // Positions are remembered per slot, so a playlist resumes where it was after an interrupt
+  // (e.g. traffic info shown for one minute every 15 minutes).
+  const positions = {};
+
   function evaluate(force) {
     if (!manifest || !manifest.display.approved) return;
     const r = KevSchedule.resolve(manifest.schedules, manifest.display, new Date());
-    const pl = r.playlistId && manifest.playlists[r.playlistId];
+    const pl = r.key && manifest.playlists[r.key];
     if (!pl || !pl.items.length) {
-      current = { playlistId: null, index: -1, item: null };
+      if (current.slot) positions[current.slot] = current.index;
+      current = { slot: null, key: null, index: -1, item: null, itemDuration: 0 };
       clearTimeout(timer);
       clearLayers();
       showIdle(true);
       return;
     }
     showIdle(false);
-    if (r.playlistId !== current.playlistId) {
-      current = { playlistId: r.playlistId, index: -1, item: null };
+    const slot = `${r.scheduleId || 'default'}|${r.key}`;
+    if (slot !== current.slot) {
+      if (current.slot) positions[current.slot] = current.index;
+      const resume = positions[slot];
+      current = { slot, key: r.key, index: typeof resume === 'number' ? resume : -1, item: null, itemDuration: r.itemDuration };
       next();
     } else if (force) {
-      // Same playlist but content changed: keep position if the item still exists.
+      current.itemDuration = r.itemDuration;
+      // Same content but it changed: keep position if the item still exists.
       const idx = pl.items.findIndex((i) => current.item && i.itemId === current.item.itemId && i.url === current.item.url);
       if (idx === -1) { current.index = -1; next(); } else current.index = idx;
     }
   }
 
   function playlist() {
-    return manifest && manifest.playlists[current.playlistId];
+    return manifest && manifest.playlists[current.key];
   }
 
   function next() {
@@ -238,17 +252,26 @@
     if (!pl || !pl.items.length) return evaluate();
     current.index = (current.index + 1) % pl.items.length;
     const item = pl.items[current.index];
+    const prev = current.item;
     current.item = item;
+    // One item that is already on screen (e.g. a single web page): keep it instead of reloading it.
+    if (pl.items.length === 1 && prev && prev.itemId === item.itemId && prev.url === item.url && item.type !== 'video' && activeLayer.firstChild) {
+      const d = current.itemDuration > 0 ? current.itemDuration : item.duration;
+      timer = setTimeout(next, Math.max(2, d || 10) * 1000);
+      return;
+    }
+    // A schedule entry can set how long each item is shown; otherwise the item's own duration.
+    const duration = current.itemDuration > 0 ? current.itemDuration : item.duration;
     // Report what is on screen (throttled) so the admin can see it live.
     if (!next.last || Date.now() - next.last > 5000) { next.last = Date.now(); setTimeout(heartbeat, 1500); }
     show(item).then((el) => {
       if (current.item !== item) return;
-      if (item.type === 'video' && !(item.duration > 0)) {
+      if (item.type === 'video' && !(duration > 0)) {
         el.onended = () => next();
         // Safety net in case `ended` never fires (broken file).
         timer = setTimeout(next, 30 * 60 * 1000);
       } else {
-        timer = setTimeout(next, Math.max(2, item.duration || 10) * 1000);
+        timer = setTimeout(next, Math.max(2, duration || 10) * 1000);
       }
       preload(pl.items[(current.index + 1) % pl.items.length]);
     });
@@ -278,10 +301,21 @@
         el.onerror = ok;
         el.src = item.url;
       } else if (item.type === 'web') {
-        el = document.createElement('iframe');
-        el.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
-        el.onload = ok;
-        el.src = item.url;
+        // Zoom lets a desktop-sized page (departure board, traffic map) fit a TV nicely.
+        const z = (Number(item.zoom) || 100) / 100;
+        el = document.createElement('div');
+        el.className = 'web-wrap';
+        const frame = document.createElement('iframe');
+        frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
+        frame.setAttribute('referrerpolicy', 'no-referrer');
+        Object.assign(frame.style, { width: `${100 / z}%`, height: `${100 / z}%`, transform: `scale(${z})`, transformOrigin: '0 0' });
+        frame.src = item.url;
+        el.appendChild(frame);
+        // An iframe only starts loading once it is in the page, so show it right away.
+        ok();
+        if (item.refreshSeconds > 0) {
+          el._refresh = setInterval(() => { frame.src = item.url; }, Math.max(10, item.refreshSeconds) * 1000);
+        }
       } else if (item.type === 'text') {
         const t = item.text || {};
         el = document.createElement('div');
@@ -315,6 +349,7 @@
     setTimeout(() => {
       if (activeLayer !== outgoing) {
         outgoing.querySelectorAll('video').forEach((v) => { v.pause(); v.removeAttribute('src'); v.load(); });
+        outgoing.querySelectorAll('.web-wrap').forEach((w) => clearInterval(w._refresh));
         outgoing.replaceChildren();
         outgoing.className = 'layer';
       }
@@ -323,7 +358,11 @@
   }
 
   function clearLayers() {
-    for (const l of [$('layerA'), $('layerB')]) { l.replaceChildren(); l.className = 'layer'; }
+    for (const l of [$('layerA'), $('layerB')]) {
+      l.querySelectorAll('.web-wrap').forEach((w) => clearInterval(w._refresh));
+      l.replaceChildren();
+      l.className = 'layer';
+    }
   }
 
   function showIdle(on) {
@@ -356,7 +395,9 @@
   async function startPreview() {
     document.body.style.cursor = 'default';
     try {
-      const pl = await api(`/api/playlists/${encodeURIComponent(previewId)}/preview`);
+      const pl = previewId.startsWith('media:')
+        ? await api(`/api/media/${encodeURIComponent(previewId.slice(6))}/preview`)
+        : await api(`/api/playlists/${encodeURIComponent(previewId)}/preview`);
       manifest = {
         orgName: 'Preview',
         display: { approved: true, fit: qs.get('fit') || 'contain', orientation: qs.get('orientation') || 'landscape' },

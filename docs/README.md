@@ -6,7 +6,9 @@ KevCast is self-hosted narrowcasting (digital signage). You install one server. 
 | I want to… | Read |
 |---|---|
 | Install the server on Windows, Linux or macOS | [Installation](installation.md) |
-| Learn the admin: media, playlists, schedule, displays | [User guide](user-guide.md) |
+| Learn the admin: media, playlists, schedule, displays, groups | [User guide](user-guide.md) |
+| Put screens in groups and update their schedule at once | [User guide → Groups](user-guide.md#groups) |
+| Upload PowerPoints from your computer with KevCast Studio | [KevCast Studio](studio.md#uploading-from-this-computer) |
 | Set up a screen with the Player app or a browser | [KevCast Player](player.md) |
 | Use the desktop management app | [KevCast Studio](studio.md) |
 | Deploy many screens at once (GPO, Intune, MDM, Ansible) | [Enterprise roll-out](rollout.md) |
@@ -18,11 +20,18 @@ KevCast is self-hosted narrowcasting (digital signage). You install one server. 
 
 ## Quick start (5 minutes)
 
-1. **Server**: on Windows double-click `install\windows\install.bat`. On Linux run `sudo ./install/linux/install.sh`.
-2. **Admin**: open `http://<server>:8080/admin/` and create your administrator account.
+1. **Server**:
+   - Windows: run `KevCast-Setup` and keep *Server* ticked (or use `KevCast-Server-Setup`).
+   - Linux: `sudo apt install ./kevcast-server_*.deb`.
+   - macOS: open `KevCast-Server-*.pkg`.
+
+   See [Installation](installation.md#installers-recommended).
+2. **Web Studio**: double-click the **KevCast Web Studio** icon on the desktop (or open `http://<server>:8080/admin/`) and create your administrator account.
 3. **Content**: on the **Media** page drag in a PowerPoint file. Its slides are converted automatically.
 4. **Playlist**: on the **Playlists** page click **New** and click **+** next to your presentation.
-5. **Screen**: install KevCast Player on the screen's PC. It finds the server and shows a 6-character code.
+5. **Screen**: either
+   - install KevCast Player on the screen's PC (it finds the server and shows a 6-character code), or
+   - open **`http://<server>:8080/player/`** in the screen's browser.
 6. **Pair**: on the **Displays** page click **Add display**, type the code and choose your playlist as the default.
 
 Your presentation is now on screen. Use the **Schedule** page to decide what plays when.

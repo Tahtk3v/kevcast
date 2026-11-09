@@ -1,13 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { resolve, isActive } = require('../shared/schedule');
+const { resolve, isActive, occursOn, dayTimeline } = require('../shared/schedule');
 
-const display = { id: 'd1', group: 'Lobby', defaultPlaylistId: 'default' };
+const display = { id: 'd1', groups: ['Lobby', 'Floor 1'], defaultPlaylistId: 'default' };
 // 2026-11-09 is a Monday.
-const at = (dateStr, hhmm) => new Date(`${dateStr}T${hhmm}:00`);
+const at = (dateStr, hhmm, ss = '00') => new Date(`${dateStr}T${hhmm}:${ss}`);
 
 test('falls back to the display default playlist', () => {
-  assert.deepStrictEqual(resolve([], display, at('2026-11-09', '10:00')), { playlistId: 'default', scheduleId: null });
+  const r = resolve([], display, at('2026-11-09', '10:00'));
+  assert.deepStrictEqual([r.key, r.playlistId, r.scheduleId], ['default', 'default', null]);
 });
 
 test('weekday time window', () => {
@@ -49,4 +50,44 @@ test('priority beats specificity, specificity beats recency', () => {
   assert.strictEqual(resolve([all, mine], display, now).playlistId, 'mine');
   const urgent = { id: 'u', playlistId: 'urgent', allDay: true, priority: 10 };
   assert.strictEqual(resolve([all, mine, urgent], display, now).playlistId, 'urgent');
+});
+
+test('once, monthly and every-other-week repeats', () => {
+  const day = (k) => new Date(`${k}T12:00:00`);
+  const once = { repeat: 'once', startDate: '2026-11-12' };
+  assert.strictEqual(occursOn(once, day('2026-11-12')), true);
+  assert.strictEqual(occursOn(once, day('2026-11-19')), false);
+
+  const monthly = { repeat: 'monthly', monthDay: 31 };
+  assert.strictEqual(occursOn(monthly, day('2026-11-30')), true, '31st falls back to the last day');
+  assert.strictEqual(occursOn(monthly, day('2026-12-31')), true);
+  assert.strictEqual(occursOn(monthly, day('2026-12-30')), false);
+
+  const biweekly = { repeat: 'weekly', days: [1], everyWeeks: 2, startDate: '2026-11-09' };
+  assert.strictEqual(occursOn(biweekly, day('2026-11-09')), true);
+  assert.strictEqual(occursOn(biweekly, day('2026-11-16')), false);
+  assert.strictEqual(occursOn(biweekly, day('2026-11-23')), true);
+
+  const period = { repeat: 'weekly', startDate: '2026-11-10', endDate: '2026-11-11' };
+  assert.strictEqual(occursOn(period, day('2026-11-09')), false);
+  assert.strictEqual(occursOn(period, day('2026-11-11')), true);
+});
+
+test('recurring interval: every 15 minutes for 60 seconds, and it interrupts the base content', () => {
+  const traffic = { id: 't', mediaId: 'web1', start: '07:00', end: '09:00', interval: { everyMinutes: 15, showSeconds: 60 }, createdAt: '2026-01-01' };
+  const base = { id: 'b', playlistId: 'news', start: '06:00', end: '12:00', createdAt: '2026-02-01' };
+  assert.strictEqual(isActive(traffic, at('2026-11-09', '07:00', '30')), true);
+  assert.strictEqual(isActive(traffic, at('2026-11-09', '07:01', '00')), false);
+  assert.strictEqual(isActive(traffic, at('2026-11-09', '07:15', '10')), true);
+  assert.strictEqual(isActive(traffic, at('2026-11-09', '09:00', '10')), false);
+  assert.strictEqual(resolve([base, traffic], display, at('2026-11-09', '07:30', '05')).key, 'media:web1');
+  assert.strictEqual(resolve([base, traffic], display, at('2026-11-09', '07:31', '05')).key, 'news');
+});
+
+test('single media items with their own duration, and the day timeline', () => {
+  const web = { id: 'w', mediaId: 'ns', itemDuration: 45, start: '08:00', end: '10:00' };
+  const r = resolve([web], display, at('2026-11-09', '08:30'));
+  assert.deepStrictEqual([r.key, r.mediaId, r.itemDuration], ['media:ns', 'ns', 45]);
+  const tl = dayTimeline([web], display, new Date('2026-11-09T00:00:00'));
+  assert.deepStrictEqual(tl.map((s) => [s.from, s.to, s.key]), [[0, 480, 'default'], [480, 600, 'media:ns'], [600, 1440, 'default']]);
 });

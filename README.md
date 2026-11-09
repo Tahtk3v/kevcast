@@ -10,32 +10,68 @@ even when the network goes down.
 
 KevCast takes its inspiration from EasyScreen and is a simpler alternative to Xibo.
 
+![KevCast Web Studio: week overview of what a screen plays](docs/images/schedule-week-overview.png)
+
 ## Highlights
 
-- **PowerPoint as a first-class format.** Drop in a `.pptx` and every slide becomes a screen. No Office licences on screens.
-- **Visual scheduler.** Click and drag on a week calendar. Supports overnight slots, date ranges, priorities, and targeting of screens or groups.
-- **Display groups and "Send to screens".** Put a playlist on a whole floor in two clicks. Make it the default, take over now, or schedule it.
+- **PowerPoint as a first-class format.** Drop in a `.pptx` and every slide becomes a screen. No Office licences are needed on the screens.
+- **Web pages too.** Show train departures, traffic info, weather or dashboards, with zoom and auto-reload. The Player app even shows sites that normally refuse to be embedded.
+- **Visual scheduler.**
+  - Click and drag on a week calendar, or see a **week overview** of exactly what each screen plays.
+  - Schedule a playlist, a single item or a web page.
+  - Repeat weekly, every N weeks, monthly or once, valid for a period.
+  - Show something **every 15 minutes for 60 seconds**, and set how long each item stays on screen.
+- **Display groups.**
+  - Create groups like *Lobby* or *Floor 2* and tick screens to add them. A screen can be in several groups.
+  - Anything scheduled for a group plays on all its screens.
+  - Copy a group's schedule to another group, and change many schedule entries at once.
+  - **Send to screens** puts a playlist on a whole floor in two clicks.
 - **KevCast Player app** for Windows, macOS, Linux and Raspberry Pi:
   - finds the server by itself
   - runs as a fullscreen kiosk that only closes with **Alt+Q**
   - **stores the whole schedule locally** and keeps playing when the server is down
   - recovers from crashes and sends screenshots back
-- **KevCast Studio**: a desktop app to manage everything. The same interface is also in any browser.
+  - **restarts every Sunday** so Windows updates get installed
+- **KevCast Studio**: a desktop app to manage everything.
+  - Browse the folders on your computer (Desktop, Documents, OneDrive…) and upload PowerPoints with a click.
+  - The same **Web Studio** is also in any browser.
 - **Zero-touch roll-out.** Deploy the MSI or .deb plus a `player.json` with GPO, Intune, MDM or Ansible. Screens appear already approved, named and grouped.
-- **Easy to install.** One installer per OS. Plain Node.js, a JSON-file database, no Docker, no database server, no licences.
+- **Easy to install.** Separate installers for Server, Player and Studio, plus a Windows setup that lets you choose. No Docker, no database server, no licences.
 
-## Get started
+## Screenshots
 
 | | |
 |---|---|
-| **1. Install the server** | Windows: double-click `install\windows\install.bat` · Linux: `sudo ./install/linux/install.sh` · macOS: `./install/macos/install.sh` |
-| **2. Open the admin** | `http://<server>:8080/admin/` and create your account |
-| **3. Add content** | Drag a PowerPoint onto **Media**, then add it to a playlist |
-| **4. Connect a screen** | Install **KevCast Player** on the screen (or open `http://<server>:8080/player/` in a browser) and enter the code it shows under **Displays → Add display** |
-| **5. Schedule** | Drag on the **Schedule** calendar, or use **Send to screens** |
+| ![Dashboard](docs/images/dashboard.png) **Dashboard**: every screen and what it shows right now | ![Media](docs/images/media.png) **Media**: PowerPoint, images, video, web pages and text slides |
+| ![Playlist editor](docs/images/playlist-editor.png) **Playlists**: drag in media, set the time per item | ![Calendar](docs/images/schedule-calendar.png) **Schedule**: drag on the calendar; ↻ items repeat |
+| ![Schedule dialog](docs/images/schedule-dialog-webpage.png) **Schedule a web page** every 15 minutes for 60 seconds | ![Displays](docs/images/displays.png) **Displays & groups** with live screenshots and offline status |
+| ![Groups](docs/images/group-detail.png) **Groups**: screens, week plan and schedule of a whole group | ![This computer](docs/images/studio-this-computer.png) **KevCast Studio**: upload PowerPoints straight from your folders |
+| ![PowerPoint on a screen](docs/images/player-slide.png) **On screen**: a PowerPoint slide | ![Web page on a screen](docs/images/player-webpage.png) **On screen**: a live departures page |
 
-The desktop installers (`.exe`, `.msi`, `.dmg`, `.AppImage`, `.deb`) are produced by the
-[Build workflow](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml). See [docs/development.md](docs/development.md) to build them yourself.
+## Get started
+
+Each part has its own installer. Install only what a computer needs:
+
+| Installer | Install on | Windows | macOS | Linux / Raspberry Pi |
+|---|---|---|---|---|
+| **KevCast Setup**: pick Server, Player and/or Studio | any Windows PC | `KevCast-Setup-*.exe` | – | – |
+| **KevCast Server** | one computer per organisation | `KevCast-Server-Setup-*.exe` | `KevCast-Server-*.pkg` | `kevcast-server_*.deb` |
+| **KevCast Player** | each computer behind a screen | `.exe` / `.msi` | `.dmg` | `.deb` / `.AppImage` |
+| **KevCast Studio** (optional) | admins' PCs | `.exe` / `.msi` | `.dmg` | `.deb` / `.AppImage` |
+
+Download them from the latest [Build workflow run](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml) (**Artifacts**).
+
+1. **Install the server.** It adds a **KevCast Web Studio** icon to the desktop.
+2. **Open KevCast Web Studio** and create your account.
+3. **Add content**: drag a PowerPoint onto **Media**, then add it to a playlist.
+4. **Connect a screen**, in one of two ways:
+   - install **KevCast Player** (it finds the server automatically), or
+   - point any browser at **`http://<server>:8080/player/`**
+
+   The screen shows a code. Enter it under **Displays → Add display**.
+5. **Schedule**: drag on the **Schedule** calendar, or use **Send to screens**.
+
+Tip: open `http://<server>:8080/` on any computer for a start page that links to the Web Studio and shows the exact player address.
 
 ## Documentation
 
