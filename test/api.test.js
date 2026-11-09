@@ -66,6 +66,27 @@ test('full flow', async () => {
   await call('POST', '/api/schedules', { playlistId: pl.id, allDay: true, days: [0, 1, 2, 3, 4, 5, 6] });
   assert.strictEqual((await call('GET', '/api/schedules')).body.length, 1);
 
+  // Schedule a web page directly, valid for a period, recurring every 15 minutes.
+  const ns = (await call('POST', '/api/media', { type: 'web', url: 'https://example.org/departures', name: 'Departures', zoom: 80, refreshSeconds: 300 })).body;
+  const sched = (await call('POST', '/api/schedules', { mediaId: ns.id, itemDuration: 45, repeat: 'weekly', everyWeeks: 2, days: [1], start: '07:00', end: '09:00',
+    startDate: '2026-11-01', endDate: '2026-12-31', interval: { everyMinutes: 15, showSeconds: 60 } })).body;
+  assert.deepStrictEqual([sched.mediaId, sched.playlistId, sched.itemDuration, sched.everyWeeks, sched.interval.everyMinutes], [ns.id, null, 45, 2, 15]);
+  assert.strictEqual((await call('POST', '/api/schedules', { mediaId: ns.id, repeat: 'once' })).status, 400, 'once needs a date');
+  assert.strictEqual((await call('POST', '/api/schedules', { playlistId: pl.id, startDate: '2026-12-01', endDate: '2026-11-01' })).status, 400);
+  m = (await call('GET', '/api/player/manifest', null, H)).body;
+  const single = m.playlists[`media:${ns.id}`];
+  assert.deepStrictEqual([single.items.length, single.items[0].type, single.items[0].zoom, single.items[0].refreshSeconds], [1, 'web', 80, 300]);
+  assert.deepStrictEqual(m.display.maintenance, { weeklyRestart: true, day: 0, time: '03:00' });
+
+  // Weekly restart settings are validated.
+  await call('PATCH', `/api/displays/${d.id}`, { maintenance: { weeklyRestart: false, day: 9, time: 'soon' } });
+  m = (await call('GET', '/api/player/manifest', null, H)).body;
+  assert.deepStrictEqual(m.display.maintenance, { weeklyRestart: false, day: 0, time: '03:00' });
+
+  // Deleting a scheduled web page also removes its schedule entries.
+  await call('DELETE', `/api/media/${ns.id}`);
+  assert.strictEqual((await call('GET', '/api/schedules')).body.some((x) => x.mediaId === ns.id), false);
+
   // Deleting media removes it from playlists.
   await call('DELETE', `/api/media/${web.id}`);
   m = (await call('GET', '/api/player/manifest', null, H)).body;
