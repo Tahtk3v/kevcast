@@ -54,12 +54,15 @@ The Start menu folder **KevCast** contains:
 
 To change the port, edit `C:\Program Files\KevCast\Server\kevcast-server.cmd` (`set PORT=…`). Then restart the **KevCast Server** task in Task Scheduler, or reboot. Re-running the installer keeps the port you set.
 
+For a silent install (Intune, SCCM, a script), run `KevCast-Server-Setup-x.y.z-win-x64.exe /S`. Add `/NOLIBREOFFICE` to skip LibreOffice.
+The exit code is 0 when it worked.
+
 Upgrade by running a newer installer over the old one. Uninstall via *Settings → Apps → KevCast*. Your content in `C:\ProgramData\KevCast` is always kept.
 
 ### Linux: kevcast-server .deb
 
 ```bash
-sudo apt install ./kevcast-server_0.2.2_amd64.deb     # arm64 for Raspberry Pi 4/5
+sudo apt install ./kevcast-server_0.2.3_amd64.deb     # arm64 for Raspberry Pi 4/5
 ```
 `apt` pulls in LibreOffice, Poppler and matching fonts automatically. The package:
 - installs to `/opt/kevcast-server` and creates the `kevcast` system user

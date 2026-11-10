@@ -32,10 +32,14 @@ At install time:
 - `windows/service.ps1` registers the background service and the firewall rules.
 - `windows/install-libreoffice.ps1` installs LibreOffice with winget when that option is ticked.
 
+`windows/smoke-test.ps1` installs KevCast Server Setup silently (`/S /NOLIBREOFFICE`), checks the service,
+firewall rules, shortcut and web server, and uninstalls it again. CI runs it after every Windows build. It needs
+administrator rights, so only run it on a test machine.
+
 The NSIS script also compiles on Linux (`apt install nsis`), which is handy for checking syntax:
 ```bash
 node packaging/stage-server.js --platform win --arch x64 --out /tmp/stage --skip-poppler
-makensis -DVERSION=0.2.2 -DOUTFILE=/tmp/setup.exe -DSERVER_DIR=/tmp/stage \
+makensis -DVERSION=0.2.3 -DOUTFILE=/tmp/setup.exe -DSERVER_DIR=/tmp/stage \
   -DASSETS=$PWD/packaging/assets -DSCRIPTS=$PWD/packaging/windows packaging/windows/kevcast-setup.nsi
 ```
 

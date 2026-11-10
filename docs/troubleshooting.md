@@ -2,6 +2,11 @@
 
 ## Server
 
+### Windows setup: "The KevCast Server service could not be registered (code 1)"
+The details show *"The variable cannot be validated because the value … is not a valid value for the Action variable"*.
+This was a bug in KevCast Setup 0.2.2: the program files were installed, but the background service wasn't
+registered, so the server didn't start. Run **KevCast Setup 0.2.3 or later** over it. Your data is kept.
+
 ### The admin page doesn't open
 - Check the server is running:
   - Windows: Task Scheduler → *KevCast Server*, or `C:\ProgramData\KevCast\kevcast.log`

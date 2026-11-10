@@ -5,6 +5,19 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-10
+### Fixed
+- **Windows: KevCast Setup failed with "The KevCast Server service could not be registered (code 1)"**.
+  - The service script stored the scheduled-task action in `$action`. PowerShell names are case-insensitive, so that
+    was the script's own `-Action` parameter, which only accepts install/uninstall/stop/start, and the assignment failed.
+  - The program files were installed, but the server never started.
+- In a silent install (`/S`), message boxes no longer wait for a click, and a failed service registration now gives exit code 2.
+
+### Added
+- `/NOLIBREOFFICE` for KevCast Setup, so a silent install (`/S /NOLIBREOFFICE`) skips the LibreOffice download.
+- CI now really installs KevCast Server Setup on Windows, checks the service, firewall rules, shortcut and web server,
+  and uninstalls it again (`packaging/windows/smoke-test.ps1`).
+
 ## [0.2.2] - 2026-11-09
 ### Fixed
 - **macOS: "KevCast Studio/Player is damaged and can't be opened"** (Dutch: *"is beschadigd"*).

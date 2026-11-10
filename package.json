@@ -1,6 +1,6 @@
 {
   "name": "kevcast",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Easy, self-hosted narrowcasting / digital signage with PowerPoint support, a visual scheduler and browser-based players.",
   "main": "server/index.js",
   "type": "commonjs",

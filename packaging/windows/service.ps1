@@ -53,12 +53,14 @@ cd /d "$ServerDir\app"
 "@ | Set-Content -Path $Launcher -Encoding ASCII
 
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-    $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$Launcher`""
+    # Not "$action": PowerShell names are case-insensitive, so that would be the -Action parameter
+    # (only install/uninstall/stop/start allowed) and the assignment would fail.
+    $taskAction = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$Launcher`""
     $trigger = New-ScheduledTaskTrigger -AtStartup
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable `
       -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
     $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal `
+    Register-ScheduledTask -TaskName $TaskName -Action $taskAction -Trigger $trigger -Settings $settings -Principal $principal `
       -Description 'KevCast narrowcasting server' | Out-Null
 
     Remove-NetFirewallRule -DisplayName 'KevCast' -ErrorAction SilentlyContinue

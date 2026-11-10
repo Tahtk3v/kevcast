@@ -82,6 +82,11 @@ jobs:
         shell: pwsh
         run: ./packaging/windows/build.ps1
 
+      - name: Install KevCast Server Setup silently, check the server answers, uninstall it
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./packaging/windows/smoke-test.ps1
+
       - name: Build KevCast Server .deb (amd64 + arm64)
         if: runner.os == 'Linux'
         run: |
