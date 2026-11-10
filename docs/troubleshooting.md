@@ -21,9 +21,20 @@ registered, so the server didn't start. Run **KevCast Setup 0.3.0 or later** ove
 - Windows: if the server runs as SYSTEM and a LibreOffice update is stuck, reboot the server once after installing LibreOffice.
 - As a workaround, export the presentation to **PDF** in PowerPoint and upload the PDF. Only the rendering step is needed then.
 
-### Slides look different from PowerPoint
-LibreOffice renders the slides. It uses the fonts installed **on the server**.
-- Install the fonts your presentations use on the server, then click **Re-convert** on the media item.
+### Slides look different from PowerPoint, or the text is garbled or misplaced
+LibreOffice renders the slides. It uses the fonts installed **on the server**. A missing font is replaced by
+another one, which makes text wider or narrower, so it wraps differently and boxes no longer line up.
+- KevCast checks every PowerPoint after converting it. The media card then says *⚠ N fonts missing on the server*,
+  and the Media page lists which fonts.
+- Install those fonts on the server **for all users**: on Windows, right-click the font file → **Install for all users**.
+  A plain *Install* puts the font in your own account only, and the KevCast service (which runs as SYSTEM) can't see it.
+  On Linux, copy the font to `/usr/local/share/fonts` and run `sudo fc-cache -f`.
+- Then click **Re-convert these** on the Media page, **Re-convert** on one item, or **Settings → Server → Re-convert all**.
+- **Garbled letters** (pieces of letters cut off or overlapping) on a Windows server with KevCast 0.3.0 or earlier: the
+  bundled slide renderer couldn't find fonts that weren't embedded in the PDF. Fixed in 0.4.0: update the server, then
+  re-convert.
+- For a pixel-perfect result, export the presentation to **PDF** in PowerPoint (*File → Export → PDF*) and upload the PDF:
+  PowerPoint then embeds its own fonts and layout.
 - On Linux the installer adds Carlito and Caladea, which have the same metrics as Calibri and Cambria.
 - Animations and slide transitions are not kept, because each slide becomes a still image. Use KevCast's own transitions.
 - Embedded videos are not played. Upload the video as a separate media item.

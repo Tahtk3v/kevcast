@@ -34,14 +34,23 @@ foreach ($f in 'Server\kevcast-server.cmd', 'Server\node\node.exe', 'Server\app\
 if (-not (Test-Path (Join-Path $env:PUBLIC 'Desktop\KevCast Web Studio.url'))) { throw 'The KevCast Web Studio desktop shortcut is missing.' }
 
 $port = (Get-Content (Join-Path $installDir 'Server\port.txt') -Raw).Trim()
+# 127.0.0.1, not localhost: the server listens on IPv4 and localhost may try IPv6 (::1) first.
+# A fresh CI machine can take a while to start Node.js (virus scan), so allow up to 3 minutes.
+$base = "http://127.0.0.1:$port"
 $info = $null
-for ($i = 0; $i -lt 60 -and -not $info; $i++) {
-  try { $info = Invoke-RestMethod -TimeoutSec 2 "http://localhost:$port/api/info" } catch { Start-Sleep -Seconds 1 }
+$lastError = ''
+$watch = [Diagnostics.Stopwatch]::StartNew()
+while (-not $info -and $watch.Elapsed.TotalSeconds -lt 180) {
+  try { $info = Invoke-RestMethod -TimeoutSec 5 "$base/api/info" } catch { $lastError = $_.Exception.Message; Start-Sleep -Seconds 2 }
 }
-if (-not $info) { Show-Log; throw "The server did not answer on port $port." }
-Write-Host "Server answers on port ${port}: $($info | ConvertTo-Json -Compress)"
-Invoke-WebRequest -UseBasicParsing "http://localhost:$port/admin/" | Out-Null
-Invoke-WebRequest -UseBasicParsing "http://localhost:$port/player/" | Out-Null
+if (-not $info) {
+  Show-Log
+  Get-ScheduledTask -TaskName $taskName | Get-ScheduledTaskInfo | Format-List LastRunTime, LastTaskResult | Out-String | Write-Host
+  throw "The server did not answer on port $port within 3 minutes. Last error: $lastError"
+}
+Write-Host "Server answers on port $port after $([int]$watch.Elapsed.TotalSeconds) s: $($info | ConvertTo-Json -Compress)"
+Invoke-WebRequest -UseBasicParsing "$base/admin/" | Out-Null
+Invoke-WebRequest -UseBasicParsing "$base/player/" | Out-Null
 
 Write-Host 'Uninstalling...'
 # _?= makes the uninstaller run in place and wait, instead of copying itself to %TEMP% and returning.

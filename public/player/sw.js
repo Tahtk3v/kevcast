@@ -1,8 +1,8 @@
 // Offline support for browser players: the app shell and all media of the current
 // schedule are kept on the device, so screens keep playing through outages.
-const SHELL = 'kevcast-shell-v2';
+const SHELL = 'kevcast-shell-v3';
 const MEDIA = 'kevcast-media-v1';
-const SHELL_FILES = ['./', 'index.html', 'player.css', 'player.js', '/shared/schedule.js'];
+const SHELL_FILES = ['./', 'index.html', 'player.css', 'player.js', '/shared/schedule.js', '/shared/i18n.js', '/shared/lang/nl.js', '/shared/lang/de.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(SHELL).then((c) => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));

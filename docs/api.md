@@ -56,6 +56,7 @@ curl -b kc.txt http://server:8080/api/displays
 | PATCH | `/api/media/:id` | `{ name?, url?, text?, tags?, zoom?, refreshSeconds? }` | The media item |
 | GET | `/api/media/:id/preview` | – | The item as players receive it (used by `/player/?preview=media:<id>`) |
 | POST | `/api/media/:id/reconvert` | – | Converts a presentation again |
+| POST | `/api/media/reconvert-all` | `{ onlyMissingFonts? }` | Converts every presentation again (or only those with missing fonts): `{ count }` |
 | DELETE | `/api/media/:id` | – | Also removes it from all playlists and deletes schedule entries that play it |
 
 Presentations start with `status: "processing"` and become `"ready"` or `"error"` (with `error`).
@@ -127,7 +128,7 @@ An item looks like `{ mediaId, duration, transition?, enabled?, mute? }`:
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| GET | `/api/displays` | – | List with `online`, `scheduledPlaylistId`, `scheduleId`, `nowPlaying`, `cache`, `screenshotAt` (tokens are never returned) |
+| GET | `/api/displays` | – | List with `online`, `scheduledPlaylistId`, `scheduleId`, `groupPlaylistId` (playlist named after one of its groups), `effectivePlaylistId` (what plays when nothing is scheduled), `nowPlaying`, `cache`, `screenshotAt` (tokens are never returned) |
 | POST | `/api/displays/pair` | `{ code, name?, groups?: [], defaultPlaylistId? }` | The approved display |
 | PATCH | `/api/displays/:id` | Any of `{ name, groups, defaultPlaylistId, orientation, fit, showClock, ticker, background, notes, maintenance }` | The display |
 | PATCH | `/api/displays/bulk` | `{ ids?: [], group?: "name", all?: true, addGroups?: [], removeGroups?: [], patch: { groups, defaultPlaylistId, orientation, fit, showClock, ticker, background, maintenance } }` | `{ updated }` |
@@ -147,7 +148,7 @@ curl -b kc.txt -X PATCH -H 'Content-Type: application/json' \
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| GET | `/api/groups` | – | `[{ id, name, color, description, displayIds, members, online, schedules }]` |
+| GET | `/api/groups` | – | `[{ id, name, color, description, displayIds, members, online, schedules, playlistId }]`. `playlistId`: the playlist with the same name, if any. |
 | POST | `/api/groups` | `{ name, color?, description?, displayIds? }` | The group (409 if the name exists) |
 | PATCH | `/api/groups/:id` | `{ name?, color?, description? }` | The group. Renaming updates the members and schedule entries. |
 | POST | `/api/groups/:id/members` | `{ add?: [displayId], remove?: [displayId] }` | The group |

@@ -28,34 +28,35 @@
     .muted { color: #64748b; font-size: 13px; }
     a { color: #a5b4fc; }
   </style>
+  <script src="/shared/i18n.js"></script>
 </head>
 <body>
   <main>
     <div class="logo"><div class="mark"></div><span id="org">KevCast</span></div>
-    <h1>KevCast narrowcasting server <span id="ver"></span></h1>
+    <h1><span data-i18n>KevCast narrowcasting server</span> <span id="ver"></span></h1>
     <div class="grid">
       <section class="card">
-        <h2>Manage content</h2>
-        <p>Upload PowerPoint, build playlists, plan the schedule and manage screens.</p>
-        <a class="btn" href="/admin/">Open KevCast Web Studio</a>
-        <p class="muted">Prefer an app? Install <b>KevCast Studio</b>. It finds this server automatically.</p>
+        <h2 data-i18n>Manage content</h2>
+        <p data-i18n>Upload PowerPoint, build playlists, plan the schedule and manage screens.</p>
+        <a class="btn" href="/admin/" data-i18n>Open KevCast Web Studio</a>
+        <p class="muted" data-i18n-html>Prefer an app? Install <b>KevCast Studio</b>. It finds this server automatically.</p>
       </section>
       <section class="card">
-        <h2>Turn a screen into a player</h2>
-        <p><b>With a web browser</b> (smart TV, PC, tablet): open this page in full screen:</p>
+        <h2 data-i18n>Turn a screen into a player</h2>
+        <p data-i18n-html><b>With a web browser</b> (smart TV, PC, tablet): open this page in full screen:</p>
         <div id="urls"><div class="url"><span id="fallback"></span></div></div>
         <ol>
-          <li>The screen shows a 6-character code.</li>
-          <li>In the Web Studio go to <b>Displays → Add display</b> and enter it.</li>
-          <li>Press <b>F11</b> on the screen for full screen.</li>
+          <li data-i18n>The screen shows a 6-character code.</li>
+          <li data-i18n-html>In the Web Studio go to <b>Displays → Add display</b> and enter it.</li>
+          <li data-i18n-html>Press <b>F11</b> on the screen for full screen.</li>
         </ol>
-        <p class="muted">For PCs, mini-PCs and Raspberry Pi, the <b>KevCast Player</b> app is recommended: it starts automatically,
-          keeps playing offline and can only be closed with Alt+Q.</p>
+        <p class="muted" data-i18n-html>For PCs, mini-PCs and Raspberry Pi, the <b>KevCast Player</b> app is recommended: it starts automatically, keeps playing offline and can only be closed with Alt+Q.</p>
       </section>
     </div>
-    <p class="muted" style="margin-top:22px">Documentation: <a href="https://github.com/tahtk3v/kevcast/tree/main/docs">github.com/tahtk3v/kevcast</a></p>
+    <p class="muted" style="margin-top:22px"><span data-i18n>Documentation:</span> <a href="https://github.com/tahtk3v/kevcast/tree/main/docs">github.com/tahtk3v/kevcast</a></p>
   </main>
   <script>
+    KevI18n.translatePage();
     const fallback = `${location.protocol}//${location.host}/player/`;
     document.getElementById('fallback').textContent = fallback;
     fetch('/api/info').then((r) => r.json()).then((info) => {
@@ -71,8 +72,8 @@
         const s = document.createElement('span');
         s.textContent = u;
         const b = document.createElement('button');
-        b.textContent = 'Copy';
-        b.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(u); b.textContent = 'Copied'; };
+        b.textContent = t('Copy');
+        b.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(u); b.textContent = t('Copied'); };
         row.append(s, b);
         return row;
       }));

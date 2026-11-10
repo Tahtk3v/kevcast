@@ -71,7 +71,7 @@ cd /d "$ServerDir\app"
     Start-ScheduledTask -TaskName $TaskName
     # Wait (max 30 s) until the server answers, so the shortcuts work right after setup.
     for ($i = 0; $i -lt 30; $i++) {
-      try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 "http://localhost:$Port/api/session" | Out-Null; break } catch { Start-Sleep -Seconds 1 }
+      try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 "http://127.0.0.1:$Port/api/session" | Out-Null; break } catch { Start-Sleep -Seconds 1 }
     }
     # Tell the installer which port is in use (it writes the shortcuts).
     Set-Content -Path (Join-Path $ServerDir 'port.txt') -Value $Port -Encoding ASCII

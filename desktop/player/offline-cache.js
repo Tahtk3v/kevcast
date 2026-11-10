@@ -18,7 +18,7 @@ const crypto = require('crypto');
 const { Readable } = require('stream');
 const { net } = require('electron');
 
-const SHELL = /^\/(player\/|shared\/schedule\.js$)/;
+const SHELL = /^\/(player\/|shared\/)/;
 const MANIFEST = '/api/player/manifest';
 const NETWORK_TIMEOUT_MS = 8000;
 

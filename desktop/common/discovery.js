@@ -1,6 +1,7 @@
 // Finds KevCast servers on the local network by UDP broadcast (see startDiscovery in server/index.js).
 const dgram = require('dgram');
 const os = require('os');
+const { t: tr } = require('./i18n');
 
 const DISCOVERY_PORT = 41234;
 
@@ -82,10 +83,10 @@ async function check(url) {
     const res = await fetch(`${url}/api/session`, { signal: ctrl.signal });
     clearTimeout(t);
     const j = await res.json();
-    if (!j || !j.version) throw new Error('Not a KevCast server');
+    if (!j || !j.version) throw new Error(tr('Not a KevCast server'));
     return { ok: true, name: j.orgName, version: j.version };
   } catch (e) {
-    return { ok: false, error: e.name === 'AbortError' ? 'No answer from this address' : e.message };
+    return { ok: false, error: e.name === 'AbortError' ? tr('No answer from this address') : e.message };
   }
 }
 

@@ -85,6 +85,13 @@ Click a card to open its details. From there you can:
 - **Schedule** the item on its own, without a playlist.
 - **Delete** it. The item is also removed from every playlist.
 
+**Deleting quickly:** hover over a card and click the red 🗑 in its corner. To delete several items at once, tick the
+box next to it on each card (once one is ticked, clicking a card ticks it), then click **Delete** in the bar that appears.
+
+**⚠ fonts missing on the server** on a PowerPoint card means the slides were made with a replacement font. The Media page
+says which fonts; install them on the server *for all users* and click **Re-convert these**. See
+[Troubleshooting](troubleshooting.md#slides-look-different-from-powerpoint-or-the-text-is-garbled-or-misplaced).
+
 **Used in** lists the playlists that contain the item. Use the filter chips (Images, Videos, PowerPoint & PDF, …) and the search box to find things.
 
 ## Playlists
@@ -102,13 +109,26 @@ The page has three columns: your playlists, the editor and the media library.
 | Reorder | Drag an item by its handle ⋮⋮ |
 | Duration | Seconds per item. For PowerPoint it's **seconds per slide**. Empty = playlist default. For videos, empty = play to the end. |
 | Skip temporarily | Untick the checkbox; the item stays in the list |
-| Remove | 🗑 on the row |
+| Remove | Hover over the row and click 🗑. The file stays in Media. **Undo** in the message puts it back. |
+| Delete media from the library | Hover over it in the library on the right and click 🗑 |
 | Rename / colour | Edit the name at the top. The colour is used in the schedule calendar. |
 | Default time and transition | Fade, Slide, Zoom or None for the whole playlist |
 | Preview | Opens exactly what a screen will show, in a new window |
-| Duplicate / delete | Icons next to the name |
+| Duplicate / delete | Icons next to the name, or hover over a playlist in the left column and click 🗑 |
 
 Changes save automatically. *All changes saved* appears at the top. The total running time is shown above the list.
+
+### A playlist for each group
+
+Give a playlist **the same name as a display group** (capitals and spaces at the ends don't matter), and every screen in
+that group plays it whenever nothing is scheduled. You don't have to schedule it or set it as each screen's default.
+
+- The editor then shows *Plays on group “Canteen”* and the playlist list marks it with ▦ group.
+- A group's page shows **Group playlist: …**, or **Create playlist “…”** if there isn't one yet.
+- Scheduling or sending that playlist preselects its group.
+- Schedules still take priority. A group playlist replaces the screens' own default playlist; rename the playlist and
+  the screens go back to their own default.
+- A screen in several groups with their own playlist plays the playlist of the group listed first in its settings.
 
 ## Schedule
 
@@ -311,7 +331,7 @@ Deleting a group never deletes screens. Schedule entries aimed **only** at that 
 
 
 Everyone sees:
-- **Your account**: your name and role, **Change password** (this signs you out on your other devices) and **Sign out**.
+- **Your account**: your name and role, **Language**, **Change password** (this signs you out on your other devices) and **Sign out**.
 - **Connect a screen**: the player addresses of this server, with copy buttons.
 - **Server**: whether LibreOffice and the slide renderer were found (with install hints), version, platform and data folder.
 
@@ -339,6 +359,18 @@ Give everyone who manages the screens their own account: **Settings → Users �
 - **Remove** a user to stop them signing in. What they made (media, playlists, schedules) stays.
 - There is always at least one administrator: the last one can't be removed or made an editor, and you can't remove yourself.
 - The same accounts work in KevCast Studio, the Web Studio in a browser and the API.
+
+### Language
+
+KevCast speaks **English, Dutch (Nederlands) and German (Deutsch)**. It follows the language of the computer
+(Windows, macOS or Linux, or the browser's language settings) automatically:
+
+- **Web Studio and KevCast Studio**: in the computer's language. Under **Settings → Your account → Language** you can
+  pick another one for that computer; *Automatic* goes back to the computer's language.
+- **Screens**: the pairing code screen and messages follow the language of the screen's own computer. Dates on the idle
+  clock use it too. Your content itself is never translated.
+- **The start page** of the server and the desktop apps' own menus and "connect to server" window follow it as well.
+- Any other language falls back to English.
 
 ## Tips for good-looking screens
 

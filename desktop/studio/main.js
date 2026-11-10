@@ -6,6 +6,7 @@ const path = require('path');
 const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
 const { createConfig } = require('../common/config');
 const { openConnectWindow } = require('../common/connect-window');
+const { t: tr } = require('../common/i18n');
 const { registerLocalFiles } = require('./local-files');
 
 app.setName('KevCast Studio');
@@ -30,7 +31,7 @@ function rememberServer(url) {
 }
 
 function openPreview(url) {
-  const w = new BrowserWindow({ width: 1280, height: 760, backgroundColor: '#000', title: 'Preview — KevCast', autoHideMenuBar: true, parent: win });
+  const w = new BrowserWindow({ width: 1280, height: 760, backgroundColor: '#000', title: tr('Preview — KevCast'), autoHideMenuBar: true, parent: win });
   w.loadURL(url);
 }
 
@@ -72,9 +73,9 @@ function createMainWindow() {
     const r = await dialog.showMessageBox(win, {
       type: 'warning',
       title: 'KevCast Studio',
-      message: `Can't reach the KevCast server at ${base()}`,
+      message: tr("Can't reach the KevCast server at {url}", { url: base() }),
       detail: desc,
-      buttons: ['Try again', 'Choose another server', 'Quit'],
+      buttons: [tr('Try again'), tr('Choose another server'), tr('Quit')],
     });
     if (r.response === 0) win.loadURL(`${base()}/admin/`);
     else if (r.response === 1) showConnect();
@@ -109,40 +110,40 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     ...(isMac ? [{ role: 'appMenu' }] : []),
     {
-      label: 'File',
+      label: tr('File'),
       submenu: [
-        { label: 'Upload files…', accelerator: 'CmdOrCtrl+U', click: () => uploadFromMenu() },
-        { label: 'New playlist', accelerator: 'CmdOrCtrl+N', click: () => go('playlists') },
+        { label: tr('Upload files…'), accelerator: 'CmdOrCtrl+U', click: () => uploadFromMenu() },
+        { label: tr('New playlist'), accelerator: 'CmdOrCtrl+N', click: () => go('playlists') },
         { type: 'separator' },
-        { label: 'Connect to another server…', click: showConnect },
-        ...(recent.length ? [{ label: 'Recent servers', submenu: recent }] : []),
-        { label: 'Open in web browser', click: () => shell.openExternal(`${base()}/admin/`) },
+        { label: tr('Connect to another server…'), click: showConnect },
+        ...(recent.length ? [{ label: tr('Recent servers'), submenu: recent }] : []),
+        { label: tr('Open in web browser'), click: () => shell.openExternal(`${base()}/admin/`) },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
     },
     { role: 'editMenu' },
     {
-      label: 'Go',
+      label: tr('Go'),
       submenu: [
-        { label: 'Dashboard', accelerator: 'CmdOrCtrl+1', click: () => go('dashboard') },
-        { label: 'Media', accelerator: 'CmdOrCtrl+2', click: () => go('media') },
-        { label: 'Playlists', accelerator: 'CmdOrCtrl+3', click: () => go('playlists') },
-        { label: 'Schedule', accelerator: 'CmdOrCtrl+4', click: () => go('schedule') },
-        { label: 'Displays', accelerator: 'CmdOrCtrl+5', click: () => go('displays') },
-        { label: 'Groups', accelerator: 'CmdOrCtrl+6', click: () => go('groups') },
-        { label: 'Settings', accelerator: 'CmdOrCtrl+,', click: () => go('settings') },
+        { label: tr('Dashboard'), accelerator: 'CmdOrCtrl+1', click: () => go('dashboard') },
+        { label: tr('Media'), accelerator: 'CmdOrCtrl+2', click: () => go('media') },
+        { label: tr('Playlists'), accelerator: 'CmdOrCtrl+3', click: () => go('playlists') },
+        { label: tr('Schedule'), accelerator: 'CmdOrCtrl+4', click: () => go('schedule') },
+        { label: tr('Displays'), accelerator: 'CmdOrCtrl+5', click: () => go('displays') },
+        { label: tr('Groups'), accelerator: 'CmdOrCtrl+6', click: () => go('groups') },
+        { label: tr('Settings'), accelerator: 'CmdOrCtrl+,', click: () => go('settings') },
       ],
     },
     {
-      label: 'View',
+      label: tr('View'),
       submenu: [{ role: 'reload' }, { role: 'forceReload' }, { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' },
         { type: 'separator' }, { role: 'togglefullscreen' }, { role: 'toggleDevTools' }],
     },
     { role: 'windowMenu' },
     {
       role: 'help',
-      submenu: [{ label: `KevCast Studio ${require('../package.json').version} — connected to ${cfg.server || 'nothing'}`, enabled: false }],
+      submenu: [{ label: tr('KevCast Studio {version} — connected to {server}', { version: require('../package.json').version, server: cfg.server || tr('nothing') }), enabled: false }],
     },
   ]));
 }
@@ -150,7 +151,7 @@ function buildMenu() {
 function showConnect() {
   openConnectWindow({
     appName: 'KevCast Studio',
-    intro: 'Connect to the KevCast server you want to manage.',
+    intro: tr('Connect to the KevCast server you want to manage.'),
     current: cfg.server,
     autoConnect: !cfg.server,
     canCancel: !!win,

@@ -59,6 +59,28 @@ See [Architecture](architecture.md#components).
 - New schedule logic goes in `shared/schedule.js`, with a test in `test/schedule.test.js`.
 - API changes: update [docs/api.md](api.md) and add to `test/api.test.js`.
 
+## Translations
+
+The interface is available in English, Dutch and German. The English text is the key:
+
+```js
+t('Upload files')                                // → "Bestanden uploaden" in Dutch
+t('Welcome to {orgName}', { orgName })           // placeholders in {braces}
+tn(count, '{n} screen', '{n} screens')           // singular / plural ({n} is the count)
+```
+
+- `shared/i18n.js` picks the language (`navigator.languages`, or the choice under Settings stored in the browser) and
+  loads `shared/lang/<lang>.js`. It is used by the Web Studio, the player and the start page. Static HTML uses
+  `data-i18n` (text) or `data-i18n-html` (markup) on the element.
+- Server error messages are English and translated in the Web Studio, so send fixed texts from the server.
+- The desktop apps' menus, dialogs and connect window use `desktop/common/i18n.js`, which follows the OS language.
+- `npm test` (`test/i18n.test.js`) fails when a `t()`/`tn()` text or a `data-i18n` element has no Dutch or German
+  translation, or when a translation drops a `{placeholder}` or `<b>` tag. Add the missing entries to `shared/lang/nl.js`
+  and `shared/lang/de.js`.
+- **Another language:** copy `shared/lang/nl.js` to `shared/lang/<code>.js`, translate it, add the code to `SUPPORTED`
+  and `NAMES` in `shared/i18n.js` (and to `desktop/common/i18n.js`), add it to the service worker's file list
+  (`public/player/sw.js`) and to the languages checked in `test/i18n.test.js`.
+
 ## Dependency updates
 Dependabot ([`.github/dependabot.yml`](../.github/dependabot.yml)) opens pull requests for npm packages (server and desktop)
 and GitHub Actions. Security fixes arrive as soon as an advisory is published. Enable it under

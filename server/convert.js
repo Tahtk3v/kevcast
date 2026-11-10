@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
+const { windowsFontconfig } = require('./fonts');
 
 const PRESENTATION_EXT = ['.pptx', '.ppt', '.pps', '.ppsx', '.pot', '.potx', '.odp', '.key'];
 
@@ -106,7 +107,11 @@ async function toPdf(input, outDir) {
 async function pdfToImages(pdf, outDir, width = 1920) {
   const pdftoppm = findPdftoppm();
   if (pdftoppm) {
-    await run(pdftoppm, ['-jpeg', '-jpegopt', 'quality=90', '-scale-to', String(width), pdf, path.join(outDir, 'slide')]);
+    // Windows builds of Poppler need a fontconfig file to find fonts that aren't embedded in the PDF.
+    const env = process.platform === 'win32' && !process.env.FONTCONFIG_FILE
+      ? { ...process.env, FONTCONFIG_FILE: windowsFontconfig(path.join(os.tmpdir(), 'kevcast-fontconfig')) }
+      : process.env;
+    await run(pdftoppm, ['-jpeg', '-jpegopt', 'quality=90', '-scale-to', String(width), pdf, path.join(outDir, 'slide')], { env });
   } else {
     const gs = findGhostscript();
     if (!gs) throw new Error('No PDF rasteriser found. Install Poppler (pdftoppm) or Ghostscript on the server (see README).');

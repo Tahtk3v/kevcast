@@ -203,3 +203,70 @@ test('0.2.x single admin account becomes the first administrator', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('a playlist named like a group plays on that group', async () => {
+  await call('POST', '/api/login', { username: 'sam', password: 'newpass1' }); // administrator after the users test
+  const own = (await call('POST', '/api/playlists', { name: 'Own default' })).body;
+  const reg = (await call('POST', '/api/player/register', {})).body;
+  const d = (await call('POST', '/api/displays/pair', { code: reg.pairingCode, name: 'Canteen 1', groups: ['Canteen'], defaultPlaylistId: own.id })).body;
+  const H = { 'x-display-token': reg.token };
+  let m = (await call('GET', '/api/player/manifest', null, H)).body;
+  assert.strictEqual(m.display.defaultPlaylistId, own.id, 'without a group playlist the screen plays its own default');
+
+  const canteen = (await call('POST', '/api/playlists', { name: ' canteen ' })).body; // case and spaces don't matter
+  m = (await call('GET', '/api/player/manifest', null, H)).body;
+  assert.strictEqual(m.display.defaultPlaylistId, canteen.id, 'the group playlist wins');
+  assert.strictEqual(m.display.ownDefaultPlaylistId, own.id);
+  assert.ok(m.playlists[canteen.id], 'the group playlist is in the manifest');
+  const pub = (await call('GET', '/api/displays')).body.find((x) => x.id === d.id);
+  assert.strictEqual(pub.groupPlaylistId, canteen.id);
+  assert.strictEqual(pub.scheduledPlaylistId, canteen.id);
+  assert.strictEqual((await call('GET', '/api/groups')).body.find((g) => g.name === 'Canteen').playlistId, canteen.id);
+
+  // Schedules still win over the group playlist.
+  const sched = (await call('POST', '/api/schedules', { playlistId: own.id, allDay: true, days: [0, 1, 2, 3, 4, 5, 6], targets: { groups: ['Canteen'] } })).body;
+  assert.strictEqual((await call('GET', '/api/displays')).body.find((x) => x.id === d.id).scheduledPlaylistId, own.id);
+  await call('DELETE', `/api/schedules/${sched.id}`);
+
+  // Renamed: the screen falls back to its own default.
+  await call('PUT', `/api/playlists/${canteen.id}`, { name: 'Canteen menu' });
+  m = (await call('GET', '/api/player/manifest', null, H)).body;
+  assert.strictEqual(m.display.defaultPlaylistId, own.id);
+});
+
+test('re-convert all presentations', async () => {
+  const r = (await call('POST', '/api/media/reconvert-all', {})).body;
+  assert.strictEqual(r.count, 0, 'no presentations uploaded in these tests');
+});
+
+test('fonts used by a PowerPoint file', () => {
+  const zlib = require('zlib');
+  const { fontsUsed } = require('../server/fonts');
+  // A minimal .pptx-like zip with one slide and one theme.
+  const files = {
+    'ppt/slides/slide1.xml': '<p:sld><a:rPr><a:latin typeface="Corporate Sans"/><a:ea typeface="MS Gothic"/></a:rPr><a:latin typeface="+mj-lt"/></p:sld>',
+    'ppt/theme/theme1.xml': '<a:theme><a:majorFont><a:latin typeface="Calibri Light"/><a:font script="Jpan" typeface="Yu Gothic"/></a:majorFont><a:minorFont><a:latin typeface="Calibri"/></a:minorFont></a:theme>',
+    'docProps/app.xml': '<a:latin typeface="Ignored"/>',
+  };
+  const local = [];
+  const central = [];
+  let offset = 0;
+  for (const [name, text] of Object.entries(files)) {
+    const data = zlib.deflateRawSync(Buffer.from(text));
+    const n = Buffer.from(name);
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(8, 8); lh.writeUInt32LE(data.length, 18); lh.writeUInt32LE(text.length, 22); lh.writeUInt16LE(n.length, 26);
+    const ch = Buffer.alloc(46);
+    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(8, 10); ch.writeUInt32LE(data.length, 20); ch.writeUInt32LE(text.length, 24); ch.writeUInt16LE(n.length, 28); ch.writeUInt32LE(offset, 42);
+    local.push(lh, n, data);
+    central.push(ch, n);
+    offset += 30 + n.length + data.length;
+  }
+  const cd = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(Object.keys(files).length, 8); end.writeUInt16LE(Object.keys(files).length, 10);
+  end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(offset, 16);
+  const file = path.join(process.env.KEVCAST_DATA, 'fonts.pptx');
+  fs.writeFileSync(file, Buffer.concat([...local, cd, end]));
+  assert.deepStrictEqual(fontsUsed(file).sort(), ['Calibri', 'Calibri Light', 'Corporate Sans']);
+});

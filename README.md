@@ -35,6 +35,7 @@ KevCast takes its inspiration from Easescreen and is a simpler alternative to Xi
 - **KevCast Studio**: a desktop app to manage everything.
   - Browse the folders on your computer (Desktop, Documents, OneDrive…) and upload PowerPoints with a click.
   - The same **Web Studio** is also in any browser.
+- **Dutch and German.** The Web Studio, the apps and the screens follow the computer's language (English, Nederlands, Deutsch).
 - **Users and roles.** Give everyone their own account: **Editors** manage content, playlists, schedules and screens; **Administrators** also manage users and server settings.
 - **Zero-touch roll-out.** Deploy the MSI or .deb plus a `player.json` with GPO, Intune, MDM or Ansible. Screens appear already approved, named and grouped.
 - **Easy to install.** Separate installers for Server, Player and Studio, plus a Windows setup that lets you choose. No Docker, no database server, no licences.
