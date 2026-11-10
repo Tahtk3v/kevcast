@@ -137,3 +137,69 @@ test('full flow', async () => {
   await call('DELETE', `/api/displays/${d.id}`);
   assert.strictEqual((await call('GET', '/api/player/manifest', null, H)).status, 401);
 });
+
+test('users and roles', async () => {
+  // Signed in as the administrator from the first test.
+  const adminCookie = cookie;
+  let users = (await call('GET', '/api/users')).body;
+  assert.strictEqual(users.length, 1);
+  assert.strictEqual(users[0].role, 'admin');
+  assert.strictEqual(users[0].hash, undefined, 'password hashes never leave the server');
+
+  assert.strictEqual((await call('POST', '/api/users', { username: 'sam smith', password: 'secret123' })).status, 400, 'no spaces');
+  assert.strictEqual((await call('POST', '/api/users', { username: 'sam', password: '123' })).status, 400, 'short password');
+  assert.strictEqual((await call('POST', '/api/users', { username: 'ADMIN', password: 'secret123' })).status, 409, 'usernames are unique, ignoring case');
+  const sam = (await call('POST', '/api/users', { username: 'sam', name: 'Sam', password: 'secret123' })).body;
+  assert.strictEqual(sam.role, 'editor', 'new users are editors by default');
+
+  // Sam signs in (username case doesn't matter) and can manage content, but not users or settings.
+  assert.strictEqual((await call('POST', '/api/login', { username: 'Sam', password: 'secret123' })).status, 200);
+  const samCookie = cookie;
+  assert.strictEqual((await call('GET', '/api/session')).body.user.role, 'editor');
+  assert.strictEqual((await call('POST', '/api/playlists', { name: 'By Sam' })).status, 200);
+  assert.strictEqual((await call('GET', '/api/overview')).body.provisioningKey, null, 'editors don’t see the roll-out key');
+  assert.strictEqual((await call('GET', '/api/users')).status, 403);
+  assert.strictEqual((await call('POST', '/api/users', { username: 'eve', password: 'secret123', role: 'admin' })).status, 403);
+  assert.strictEqual((await call('PATCH', '/api/settings', { orgName: 'Hacked' })).status, 403);
+  assert.strictEqual((await call('POST', '/api/provisioning-key/rotate')).status, 403);
+  assert.strictEqual((await call('GET', '/api/backup')).status, 403);
+  // Changing your own password keeps you signed in.
+  assert.strictEqual((await call('POST', '/api/password', { current: 'secret123', next: 'newpass1' })).status, 200);
+  assert.strictEqual((await call('GET', '/api/media')).status, 200);
+  const samCookie2 = cookie;
+  cookie = samCookie;
+  assert.strictEqual((await call('GET', '/api/media')).status, 401, 'other sessions end after a password change');
+
+  // The last administrator can't be demoted or removed; you can't remove yourself.
+  cookie = adminCookie;
+  const me = users[0];
+  assert.strictEqual((await call('PATCH', `/api/users/${me.id}`, { role: 'editor' })).status, 400);
+  assert.strictEqual((await call('DELETE', `/api/users/${me.id}`)).status, 400);
+  // Promote Sam: that signs Sam out (role changed), then Sam has admin rights.
+  assert.strictEqual((await call('PATCH', `/api/users/${sam.id}`, { role: 'admin' })).body.role, 'admin');
+  cookie = samCookie2;
+  assert.strictEqual((await call('GET', '/api/users')).status, 401);
+  await call('POST', '/api/login', { username: 'sam', password: 'newpass1' });
+  assert.strictEqual((await call('GET', '/api/users')).body.length, 2);
+  assert.strictEqual((await call('DELETE', `/api/users/${me.id}`)).status, 200, 'with two administrators one can go');
+  assert.strictEqual((await call('POST', '/api/login', { username: 'admin', password: 'secret123' })).status, 401);
+});
+
+test('0.2.x single admin account becomes the first administrator', () => {
+  const { execFileSync } = require('child_process');
+  const { hashPassword, verifyPassword } = require('../server/auth');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kevcast-migrate-'));
+  try {
+    const old = { username: 'boss', ...hashPassword('oldpass1') };
+    fs.writeFileSync(path.join(dir, 'db.json'), JSON.stringify({ settings: { orgName: 'Acme', adminUser: old }, media: [], playlists: [], displays: [], schedules: [] }));
+    execFileSync(process.execPath, ['-e', "require('./server/index'); process.exit(0)"], { cwd: path.join(__dirname, '..'), env: { ...process.env, KEVCAST_DATA: dir } });
+    const db = JSON.parse(fs.readFileSync(path.join(dir, 'db.json'), 'utf8'));
+    assert.strictEqual(db.settings.adminUser, undefined);
+    assert.strictEqual(db.users.length, 1);
+    assert.strictEqual(db.users[0].username, 'boss');
+    assert.strictEqual(db.users[0].role, 'admin');
+    assert.ok(verifyPassword('oldpass1', db.users[0]), 'the old password still works');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

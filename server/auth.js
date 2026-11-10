@@ -1,4 +1,7 @@
-// Single admin account, password hashed with scrypt, stateless signed cookie.
+// User accounts (db.users), passwords hashed with scrypt, stateless signed session cookie.
+// Roles: 'admin' (everything, including users and server settings) and 'editor' (content,
+// playlists, schedules, displays and groups). Each user has a session version (sv): raising it
+// (password change, role change, removal) signs that user out everywhere.
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -36,8 +39,8 @@ function createAuth(db, dataDir) {
   const secret = loadSecret(dataDir);
   const sign = (v) => crypto.createHmac('sha256', secret).update(v).digest('hex');
 
-  function issue(res, username) {
-    const payload = Buffer.from(JSON.stringify({ u: username, exp: Date.now() + MAX_AGE_MS })).toString('base64url');
+  function issue(res, user) {
+    const payload = Buffer.from(JSON.stringify({ u: user.id, v: user.sv || 0, exp: Date.now() + MAX_AGE_MS })).toString('base64url');
     const token = `${payload}.${sign(payload)}`;
     res.setHeader('Set-Cookie', `${COOKIE}=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=${MAX_AGE_MS / 1000}`);
   }
@@ -55,20 +58,29 @@ function createAuth(db, dataDir) {
     try {
       const data = JSON.parse(Buffer.from(payload, 'base64url').toString());
       if (data.exp < Date.now()) return null;
-      return data.u;
+      const users = db.list('users');
+      // Cookies from before multiple users (0.2.x) hold the username instead of the id.
+      const user = users.find((x) => x.id === data.u) || users.find((x) => x.username === data.u);
+      if (!user || (data.v || 0) !== (user.sv || 0)) return null;
+      return user;
     } catch {
       return null;
     }
   }
 
-  function requireAdmin(req, res, next) {
+  function requireUser(req, res, next) {
     const u = currentUser(req);
     if (!u) return res.status(401).json({ error: 'Not logged in' });
     req.user = u;
     next();
   }
 
-  return { issue, clear, currentUser, requireAdmin, hashPassword, verifyPassword };
+  function requireAdministrator(req, res, next) {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Only administrators can do this' });
+    next();
+  }
+
+  return { issue, clear, currentUser, requireUser, requireAdministrator, hashPassword, verifyPassword };
 }
 
 module.exports = { createAuth, hashPassword, verifyPassword };

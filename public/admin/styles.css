@@ -50,6 +50,8 @@ h1 { font-size: 22px; } h2 { font-size: 17px; } h3 { font-size: 15px; }
 .nav svg { width: 18px; height: 18px; flex: none; }
 .nav .badge { margin-left: auto; }
 .sidebar-foot { margin-top: auto; font-size: 12px; padding: 10px 12px; color: #64748b; }
+.sidebar-user { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #cbd5e1; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-user svg { width: 16px; height: 16px; flex: none; }
 .main { padding: 24px 28px 60px; min-width: 0; }
 .page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
 .page-head p { margin: 4px 0 0; }

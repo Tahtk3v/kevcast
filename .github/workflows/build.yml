@@ -82,6 +82,11 @@ jobs:
         shell: pwsh
         run: ./packaging/windows/build.ps1
 
+      - name: Install KevCast Server Setup silently, check the server answers, uninstall it
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./packaging/windows/smoke-test.ps1
+
       - name: Build KevCast Server .deb (amd64 + arm64)
         if: runner.os == 'Linux'
         run: |
@@ -94,9 +99,14 @@ jobs:
           bash packaging/macos/build-pkg.sh arm64
           bash packaging/macos/build-pkg.sh x64
 
+      # Each run's installers take ~2.5 GB, so keep them only briefly (releases keep their own copy):
+      # 1 day for pull requests, 7 days for main and tags. If the account's artifact storage is full,
+      # a pull request still shows whether everything builds and installs; main and releases fail.
       - uses: actions/upload-artifact@v7
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
         with:
           name: KevCast-${{ matrix.name }}
+          retention-days: ${{ github.event_name == 'pull_request' && 1 || 7 }}
           path: |
             packaging-out/*.exe
             packaging-out/*.deb

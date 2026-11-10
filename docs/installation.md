@@ -18,7 +18,7 @@ Players only talk to the server, never to the internet. An isolated signage netw
 ## Installers (recommended)
 
 Every component has its own installer, so you only install what a computer needs.
-Download them from the latest [Build workflow run](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml) (**Artifacts**), or build them yourself (see [packaging/README.md](../packaging/README.md)).
+Download them from the [latest release](https://github.com/tahtk3v/kevcast/releases/latest). Builds of the latest commit are under the latest [Build workflow run](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml) (**Artifacts**, kept for 7 days), or build them yourself (see [packaging/README.md](../packaging/README.md)).
 
 | Component | Install it on | Windows | macOS | Linux / Raspberry Pi |
 |---|---|---|---|---|
@@ -54,12 +54,15 @@ The Start menu folder **KevCast** contains:
 
 To change the port, edit `C:\Program Files\KevCast\Server\kevcast-server.cmd` (`set PORT=…`). Then restart the **KevCast Server** task in Task Scheduler, or reboot. Re-running the installer keeps the port you set.
 
+For a silent install (Intune, SCCM, a script), run `KevCast-Server-Setup-x.y.z-win-x64.exe /S`. Add `/NOLIBREOFFICE` to skip LibreOffice.
+The exit code is 0 when it worked.
+
 Upgrade by running a newer installer over the old one. Uninstall via *Settings → Apps → KevCast*. Your content in `C:\ProgramData\KevCast` is always kept.
 
 ### Linux: kevcast-server .deb
 
 ```bash
-sudo apt install ./kevcast-server_0.2.2_amd64.deb     # arm64 for Raspberry Pi 4/5
+sudo apt install ./kevcast-server_0.3.0_amd64.deb     # arm64 for Raspberry Pi 4/5
 ```
 `apt` pulls in LibreOffice, Poppler and matching fonts automatically. The package:
 - installs to `/opt/kevcast-server` and creates the `kevcast` system user
@@ -170,7 +173,7 @@ See [Configuration](configuration.md) for all environment variables.
 ![First run](images/setup.png)
 
 
-Open **KevCast Web Studio**, the desktop icon or `http://<server-address>:8080/admin/`. The first visit asks you to create the administrator account and
+Open **KevCast Web Studio**, the desktop icon or `http://<server-address>:8080/admin/`. The first visit asks you to create the first administrator account and
 name your organisation. That name is shown on idle screens and in the apps' server list.
 
 Opening the server address without a path, `http://<server-address>:8080/`, shows a start page.

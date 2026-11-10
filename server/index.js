@@ -76,6 +76,17 @@ function pruneScheduleTargets({ displayId, group }) {
   ensureGroups(used);
   if (changed || db.list('groups').length !== before) db.saveNow();
 })();
+// 0.2.x had one account in settings.adminUser; it becomes the first administrator.
+(function migrateUsers() {
+  const old = db.data.settings.adminUser;
+  if (old !== undefined) {
+    if (old && !db.list('users').length) {
+      db.list('users').push({ id: Database.id(), username: old.username, name: old.username, role: 'admin', salt: old.salt, hash: old.hash, sv: 0, createdAt: new Date().toISOString() });
+    }
+    delete db.data.settings.adminUser;
+    db.saveNow();
+  }
+})();
 const auth = createAuth(db, DATA_DIR);
 const app = express();
 app.disable('x-powered-by');
@@ -118,7 +129,7 @@ let changeTimer = null;
 db.onChange((what) => {
   clearTimeout(changeTimer);
   changeTimer = setTimeout(() => {
-    toAllPlayers('update', { what });
+    if (what !== 'users') toAllPlayers('update', { what });
     toAdmins('change', { what });
   }, 300);
 });
@@ -273,23 +284,36 @@ app.use('/media', express.static(MEDIA_DIR, { maxAge: '7d', immutable: true }));
 // ---------------------------------------------------------------------------
 // Session / setup
 // ---------------------------------------------------------------------------
+const ROLES = ['admin', 'editor'];
+const publicUser = (u) => u && { id: u.id, username: u.username, name: u.name || u.username, role: u.role, createdAt: u.createdAt, lastLogin: u.lastLogin || null };
+const findUser = (username) => {
+  const n = String(username || '').trim().toLowerCase();
+  return n ? db.list('users').find((u) => u.username.toLowerCase() === n) : null;
+};
+// Setup (create an administrator) is open while there is none: on first run, or after removing a
+// forgotten administrator from db.json (see docs/troubleshooting.md).
+const admins = () => db.list('users').filter((u) => u.role === 'admin');
+const validUsername = (n) => /^[\p{L}\p{N}._@-]{1,64}$/u.test(n);
+
 app.get('/api/session', (req, res) => {
   res.json({
-    setupRequired: !db.data.settings.adminUser,
-    user: auth.currentUser(req),
+    setupRequired: !admins().length,
+    user: publicUser(auth.currentUser(req)),
     orgName: db.data.settings.orgName,
     version: pkg.version,
   });
 });
 
 app.post('/api/setup', (req, res) => {
-  if (db.data.settings.adminUser) return bad(res, 'Already set up', 409);
-  const { username, password, orgName } = req.body || {};
-  if (!username || !password || password.length < 6) return bad(res, 'Choose a username and a password of at least 6 characters.');
-  db.data.settings.adminUser = { username, ...auth.hashPassword(password) };
+  if (admins().length) return bad(res, 'Already set up', 409);
+  const { password, orgName } = req.body || {};
+  const username = String(req.body?.username || '').trim();
+  if (!validUsername(username) || !password || password.length < 6) return bad(res, 'Choose a username (letters, digits, . _ @ -) and a password of at least 6 characters.');
+  if (findUser(username)) return bad(res, 'That username is already taken', 409);
+  const user = db.insert('users', { username, name: username, role: 'admin', sv: 0, lastLogin: new Date().toISOString(), ...auth.hashPassword(password) });
   if (orgName) db.data.settings.orgName = orgName;
   db.save('settings');
-  auth.issue(res, username);
+  auth.issue(res, user);
   res.json({ ok: true });
 });
 
@@ -300,10 +324,12 @@ app.post('/api/login', (req, res) => {
   if (Date.now() - a.t > 15 * 60 * 1000) Object.assign(a, { n: 0, t: Date.now() });
   if (a.n >= 10) return bad(res, 'Too many attempts, try again in a few minutes.', 429);
   const { username, password } = req.body || {};
-  const u = db.data.settings.adminUser;
-  if (u && username === u.username && auth.verifyPassword(String(password || ''), u)) {
+  const u = findUser(username);
+  if (u && auth.verifyPassword(String(password || ''), u)) {
     loginAttempts.delete(ip);
-    auth.issue(res, username);
+    u.lastLogin = new Date().toISOString();
+    db.save('users');
+    auth.issue(res, u);
     return res.json({ ok: true });
   }
   a.n++;
@@ -430,7 +456,8 @@ app.get('/api/player/events', playerAuth, (req, res) => {
 // Admin API
 // ---------------------------------------------------------------------------
 const admin = express.Router();
-admin.use(auth.requireAdmin);
+admin.use(auth.requireUser);
+const adminOnly = auth.requireAdministrator;
 
 admin.get('/events', (req, res) => {
   sse(res);
@@ -453,7 +480,8 @@ admin.get('/overview', (req, res) => {
     capabilities: { powerpoint: !!caps.libreoffice, pdf: !!(caps.pdftoppm || caps.ghostscript), ...caps },
     playerUrls: lanAddresses().map((ip) => `http://${ip}:${PORT}/player/`),
     serverUrls: lanAddresses().map((ip) => `http://${ip}:${PORT}`),
-    provisioningKey: provisioningKey(),
+    // Editors can't add screens with the key, so they don't get to see it.
+    provisioningKey: req.user.role === 'admin' ? provisioningKey() : null,
     platform: `${os.type()} ${os.release()}`,
     dataDir: DATA_DIR,
   });
@@ -863,28 +891,73 @@ admin.post('/schedules/bulk', (req, res) => {
 });
 
 // Settings --------------------------------------------------------------------
-admin.patch('/settings', (req, res) => {
+admin.patch('/settings', adminOnly, (req, res) => {
   if (req.body?.orgName) db.data.settings.orgName = String(req.body.orgName);
   db.save('settings');
   res.json({ ok: true });
 });
-admin.post('/provisioning-key/rotate', (req, res) => {
+admin.post('/provisioning-key/rotate', adminOnly, (req, res) => {
   db.data.settings.provisioningKey = null;
   res.json({ provisioningKey: provisioningKey() });
 });
+// Your own password. Signs you out everywhere else.
 admin.post('/password', (req, res) => {
   const { current, next } = req.body || {};
-  const u = db.data.settings.adminUser;
+  const u = req.user;
   if (!auth.verifyPassword(String(current || ''), u)) return bad(res, 'Current password is wrong', 403);
   if (!next || next.length < 6) return bad(res, 'New password must be at least 6 characters');
-  db.data.settings.adminUser = { username: u.username, ...auth.hashPassword(next) };
-  db.save('settings');
+  Object.assign(u, auth.hashPassword(next), { sv: (u.sv || 0) + 1 });
+  db.save('users');
+  auth.issue(res, u);
   res.json({ ok: true });
 });
-admin.get('/backup', (req, res) => {
+admin.get('/backup', adminOnly, (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="kevcast-backup-${new Date().toISOString().slice(0, 10)}.json"`);
-  const { settings, ...rest } = db.data;
+  const { settings, users, ...rest } = db.data;
   res.json({ ...rest, settings: { orgName: settings.orgName } });
+});
+
+// Users (administrators only) ---------------------------------------------------
+admin.get('/users', adminOnly, (req, res) => res.json(db.list('users').map(publicUser)));
+admin.post('/users', adminOnly, (req, res) => {
+  const { password, role = 'editor' } = req.body || {};
+  const username = String(req.body?.username || '').trim();
+  if (!validUsername(username)) return bad(res, 'Choose a username: letters, digits and . _ @ - only, no spaces.');
+  if (findUser(username)) return bad(res, 'That username is already taken', 409);
+  if (!ROLES.includes(role)) return bad(res, 'Unknown role');
+  if (!password || password.length < 6) return bad(res, 'The password must be at least 6 characters');
+  const name = String(req.body?.name || '').trim().slice(0, 100) || username;
+  const user = db.insert('users', { username, name, role, sv: 0, ...auth.hashPassword(password) });
+  res.json(publicUser(user));
+});
+admin.patch('/users/:id', adminOnly, (req, res) => {
+  const u = db.get('users', req.params.id);
+  if (!u) return bad(res, 'User not found', 404);
+  const { name, role, password } = req.body || {};
+  if (role !== undefined && role !== u.role) {
+    if (!ROLES.includes(role)) return bad(res, 'Unknown role');
+    if (u.role === 'admin' && admins().length === 1) return bad(res, 'There must be at least one administrator');
+    u.role = role;
+    u.sv = (u.sv || 0) + 1;
+  }
+  if (password !== undefined && password !== '') {
+    if (password.length < 6) return bad(res, 'The password must be at least 6 characters');
+    Object.assign(u, auth.hashPassword(password));
+    u.sv = (u.sv || 0) + 1;
+  }
+  if (name !== undefined) u.name = String(name).trim().slice(0, 100) || u.username;
+  u.updatedAt = new Date().toISOString();
+  db.save('users');
+  if (u.id === req.user.id) auth.issue(res, u); // keep yourself signed in
+  res.json(publicUser(u));
+});
+admin.delete('/users/:id', adminOnly, (req, res) => {
+  const u = db.get('users', req.params.id);
+  if (!u) return bad(res, 'User not found', 404);
+  if (u.id === req.user.id) return bad(res, 'You can’t remove your own account');
+  if (u.role === 'admin' && admins().length === 1) return bad(res, 'There must be at least one administrator');
+  db.remove('users', u.id);
+  res.json({ ok: true });
 });
 
 app.use('/api', admin);

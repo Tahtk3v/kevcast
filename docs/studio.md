@@ -29,7 +29,7 @@ xattr -cr "/Applications/KevCast Studio.app"
 At first start Studio searches the network and lists every KevCast server it finds, with the
 organisation name. If there is only one, it connects straight away. You can also type an address.
 
-Then sign in with your admin account. Studio remembers the server, the window size and position,
+Then sign in with your KevCast account (an administrator adds accounts under *Settings → Users*). Studio remembers the server, the window size and position,
 and up to five recent servers (**File → Recent servers**).
 
 IT can preset the server with `studio.json` (same folders as [`player.json`](rollout.md)) or

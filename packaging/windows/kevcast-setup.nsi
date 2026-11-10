@@ -23,6 +23,7 @@ RequestExecutionLevel admin
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !include "x64.nsh"
+!include "FileFunc.nsh"
 !include "Sections.nsh"
 
 !ifndef VERSION
@@ -114,7 +115,8 @@ Section "Server" SecServer
   nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\Server\service.ps1" -Action install -ServerDir "$INSTDIR\Server"'
   Pop $1
   ${If} $1 != 0
-    MessageBox MB_ICONEXCLAMATION "The KevCast Server service could not be registered (code $1). See the installation details."
+    MessageBox MB_ICONEXCLAMATION "The KevCast Server service could not be registered (code $1). See the installation details." /SD IDOK
+    SetErrorLevel 2 ; a silent install (/S) reports the failure in its exit code
   ${EndIf}
 
   ; Port chosen by service.ps1 (keeps the port of an earlier installation).
@@ -221,7 +223,7 @@ SectionEnd
 ; --------------------------------------------------------------------------
 Function .onInit
   ${IfNot} ${RunningX64}
-    MessageBox MB_ICONSTOP "KevCast needs 64-bit Windows."
+    MessageBox MB_ICONSTOP "KevCast needs 64-bit Windows." /SD IDOK
     Abort
   ${EndIf}
   SetRegView 64
@@ -234,6 +236,13 @@ Function .onInit
   !endif
   ; LibreOffice already present? Leave it unticked.
   ${If} ${FileExists} "$PROGRAMFILES64\LibreOffice\program\soffice.exe"
+    !insertmacro UnselectSection ${SecLibre}
+  ${EndIf}
+  ; Silent installs: "/S /NOLIBREOFFICE" skips the LibreOffice download.
+  ${GetParameters} $0
+  ClearErrors
+  ${GetOptions} $0 "/NOLIBREOFFICE" $1
+  ${IfNot} ${Errors}
     !insertmacro UnselectSection ${SecLibre}
   ${EndIf}
 FunctionEnd
@@ -324,5 +333,5 @@ Section "Uninstall"
 
   DeleteRegKey HKLM "${UNINST_KEY}"
   DeleteRegKey HKLM "Software\KevCast"
-  MessageBox MB_ICONINFORMATION "KevCast was removed. Your content is still in $APPDATA\KevCast (delete that folder yourself if you no longer need it)."
+  MessageBox MB_ICONINFORMATION "KevCast was removed. Your content is still in $APPDATA\KevCast (delete that folder yourself if you no longer need it)." /SD IDOK
 SectionEnd

@@ -35,6 +35,7 @@ KevCast takes its inspiration from Easescreen and is a simpler alternative to Xi
 - **KevCast Studio**: a desktop app to manage everything.
   - Browse the folders on your computer (Desktop, Documents, OneDrive…) and upload PowerPoints with a click.
   - The same **Web Studio** is also in any browser.
+- **Users and roles.** Give everyone their own account: **Editors** manage content, playlists, schedules and screens; **Administrators** also manage users and server settings.
 - **Zero-touch roll-out.** Deploy the MSI or .deb plus a `player.json` with GPO, Intune, MDM or Ansible. Screens appear already approved, named and grouped.
 - **Easy to install.** Separate installers for Server, Player and Studio, plus a Windows setup that lets you choose. No Docker, no database server, no licences.
 
@@ -59,7 +60,7 @@ Each part has its own installer. Install only what a computer needs:
 | **KevCast Player** | each computer behind a screen | `.exe` / `.msi` | `.dmg` | `.deb` / `.AppImage` |
 | **KevCast Studio** (optional) | admins' PCs | `.exe` / `.msi` | `.dmg` | `.deb` / `.AppImage` |
 
-Download them from the latest [Build workflow run](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml) (**Artifacts**).
+Download them from the [latest release](https://github.com/tahtk3v/kevcast/releases/latest). Builds of the latest commit are under the latest [Build workflow run](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml) (**Artifacts**, kept for 7 days).
 
 1. **Install the server.** It adds a **KevCast Web Studio** icon to the desktop.
 2. **Open KevCast Web Studio** and create your account.
