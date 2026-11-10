@@ -62,7 +62,7 @@ Upgrade by running a newer installer over the old one. Uninstall via *Settings â
 ### Linux: kevcast-server .deb
 
 ```bash
-sudo apt install ./kevcast-server_0.3.0_amd64.deb     # arm64 for Raspberry Pi 4/5
+sudo apt install ./kevcast-server_0.4.0_amd64.deb     # arm64 for Raspberry Pi 4/5
 ```
 `apt` pulls in LibreOffice, Poppler and matching fonts automatically. The package:
 - installs to `/opt/kevcast-server` and creates the `kevcast` system user
@@ -147,8 +147,9 @@ journalctl -u kevcast -f
 **Uninstall**: `sudo ./install/linux/uninstall.sh`. The data folder `/var/lib/kevcast` is kept.
 
 > **Fonts matter.** PowerPoint files are rendered with the fonts installed on the server. If a
-> presentation uses a corporate font, install it on the server (on Linux: copy it to
-> `/usr/local/share/fonts` and run `fc-cache -f`), then click **Re-convert** on the media item.
+> presentation uses a corporate font, install it on the server **for all users** (Windows: right-click â†’
+> *Install for all users*; Linux: copy it to `/usr/local/share/fonts` and run `fc-cache -f`), then click
+> **Re-convert**. KevCast warns on the media card when a presentation uses a font the server doesn't have.
 
 ### macOS script
 

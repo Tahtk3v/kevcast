@@ -78,7 +78,9 @@ PDFs skip step 2. Failures store a readable `error` on the media item, shown in 
    3. specificity (display > group > all)
    4. newest
 5. The winner's playlist (or single item, key `media:<id>`) plays, with `itemDuration` overriding each item's time.
-   Without a winner the display's default playlist plays, and without a default, the idle clock.
+   Without a winner the **group playlist** plays (a playlist named like one of the display's groups, ignoring case),
+   otherwise the display's own default playlist, and without either, the idle clock. The server works out which
+   default applies and sends it to the player as `display.defaultPlaylistId`.
 
 The player runs this every 5 seconds against its own copy of the schedule. It keeps working while disconnected,
 and remembers the position in each playlist, so a playlist resumes after a recurring item.
@@ -123,7 +125,7 @@ A client sends the UDP datagram `KEVCAST_DISCOVER` to port 41234 on:
 
 Each server replies to the sender with JSON:
 ```json
-{ "kevcast": true, "id": "server-instance-id", "name": "Acme HQ", "version": "0.3.0", "port": 8080, "urls": ["http://192.168.1.20:8080"] }
+{ "kevcast": true, "id": "server-instance-id", "name": "Acme HQ", "version": "0.4.0", "port": 8080, "urls": ["http://192.168.1.20:8080"] }
 ```
 The client uses the address the reply came from, de-duplicates by `id`, and prefers a LAN address over loopback.
 

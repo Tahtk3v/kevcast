@@ -85,6 +85,13 @@ Click a card to open its details. From there you can:
 - **Schedule** the item on its own, without a playlist.
 - **Delete** it. The item is also removed from every playlist.
 
+**Deleting quickly:** hover over a card and click the red 🗑 in its corner. To delete several items at once, tick the
+box next to it on each card (once one is ticked, clicking a card ticks it), then click **Delete** in the bar that appears.
+
+**⚠ fonts missing on the server** on a PowerPoint card means the slides were made with a replacement font. The Media page
+says which fonts; install them on the server *for all users* and click **Re-convert these**. See
+[Troubleshooting](troubleshooting.md#slides-look-different-from-powerpoint-or-the-text-is-garbled-or-misplaced).
+
 **Used in** lists the playlists that contain the item. Use the filter chips (Images, Videos, PowerPoint & PDF, …) and the search box to find things.
 
 ## Playlists
@@ -102,13 +109,26 @@ The page has three columns: your playlists, the editor and the media library.
 | Reorder | Drag an item by its handle ⋮⋮ |
 | Duration | Seconds per item. For PowerPoint it's **seconds per slide**. Empty = playlist default. For videos, empty = play to the end. |
 | Skip temporarily | Untick the checkbox; the item stays in the list |
-| Remove | 🗑 on the row |
+| Remove | Hover over the row and click 🗑. The file stays in Media. **Undo** in the message puts it back. |
+| Delete media from the library | Hover over it in the library on the right and click 🗑 |
 | Rename / colour | Edit the name at the top. The colour is used in the schedule calendar. |
 | Default time and transition | Fade, Slide, Zoom or None for the whole playlist |
 | Preview | Opens exactly what a screen will show, in a new window |
-| Duplicate / delete | Icons next to the name |
+| Duplicate / delete | Icons next to the name, or hover over a playlist in the left column and click 🗑 |
 
 Changes save automatically. *All changes saved* appears at the top. The total running time is shown above the list.
+
+### A playlist for each group
+
+Give a playlist **the same name as a display group** (capitals and spaces at the ends don't matter), and every screen in
+that group plays it whenever nothing is scheduled. You don't have to schedule it or set it as each screen's default.
+
+- The editor then shows *Plays on group “Canteen”* and the playlist list marks it with ▦ group.
+- A group's page shows **Group playlist: …**, or **Create playlist “…”** if there isn't one yet.
+- Scheduling or sending that playlist preselects its group.
+- Schedules still take priority. A group playlist replaces the screens' own default playlist; rename the playlist and
+  the screens go back to their own default.
+- A screen in several groups with their own playlist plays the playlist of the group listed first in its settings.
 
 ## Schedule
 

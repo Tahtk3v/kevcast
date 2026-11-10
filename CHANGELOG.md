@@ -5,6 +5,25 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-10
+### Added
+- **A playlist for each group.** Name a playlist exactly like a display group and every screen in that group plays it
+  whenever nothing is scheduled. You don't need a schedule entry or a default per screen.
+  - The playlist editor says *Plays on group “…”*, and the group page has **Group playlist** or **Create playlist “…”**.
+  - Scheduling or sending that playlist preselects the group. Schedules still take priority.
+- **Missing fonts are reported.** After converting a PowerPoint, KevCast checks which fonts it uses that the server
+  doesn't have. The media card shows *⚠ N fonts missing on the server*, and the Media page lists them with how to fix it.
+- **Re-convert all**: on the Media page for presentations with missing fonts, and under **Settings → Server** for all of them.
+- **Easier deleting**: hover over a media card for a 🗑 button, tick several cards to delete them at once, and delete
+  media from the library column or playlists from the list on the Playlists page. Removing an item from a playlist can
+  be undone.
+
+### Fixed
+- **Windows: garbled or chopped-up text on PowerPoint slides.** The bundled slide renderer (Poppler) had no font
+  configuration, so fonts that LibreOffice didn't embed in the PDF came out as broken glyphs. It now uses the Windows
+  fonts folder. Re-convert affected presentations after updating.
+- CI: the Windows install test waits up to 3 minutes for the server and uses `127.0.0.1`.
+
 ## [0.3.0] - 2026-11-10
 ### Added
 - **Users and roles.** Administrators add accounts for colleagues under **Settings → Users**:

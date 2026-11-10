@@ -119,6 +119,14 @@
   }
 
   const isAdmin = () => state.session?.user?.role === 'admin';
+  // A playlist named like a group (ignoring case) plays on that group when nothing is scheduled.
+  const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+  const groupPlaylistFor = (groupName) => state.playlists.find((p) => sameName(p.name, groupName)) || null;
+  const groupsForPlaylist = (p) => state.groups.filter((g) => sameName(g.name, p.name));
+  /** A stand-in "display" for a whole group, for the schedule views. */
+  const groupTarget = (name) => ({ id: '__group', name, groups: [name], defaultPlaylistId: groupPlaylistFor(name)?.id || null });
+  /** A display as the schedule code should see it: with its group playlist as the default. */
+  const asScheduled = (d) => d && { ...d, defaultPlaylistId: d.effectivePlaylistId ?? d.defaultPlaylistId };
   const ROLE_LABEL = { admin: 'Administrator', editor: 'Editor' };
   const byId = (list, id) => list.find((x) => x.id === id);
   const playlistColor = (id) => (byId(state.playlists, id) || {}).color || '#64748b';
@@ -553,6 +561,36 @@
     uploadFiles([...e.dataTransfer.files]);
   });
 
+  const selectedMedia = new Set();
+  /** Delete media items after one confirmation. */
+  async function deleteMedia(list) {
+    if (!list.length) return false;
+    const used = list.filter((m) => state.playlists.some((p) => p.items.some((i) => i.mediaId === m.id))).length;
+    const title = list.length === 1 ? `Delete “${list[0].name}”?` : `Delete ${list.length} items?`;
+    const text = `${list.length === 1 ? 'It' : 'They'} will be removed from the library${used ? `, from ${used === 1 && list.length === 1 ? 'the playlists that use it' : 'every playlist that uses them'}` : ''} and from all screens. This can’t be undone.`;
+    if (!(await confirmBox(title, text))) return false;
+    for (const m of list) {
+      try { await api(`/media/${m.id}`, { method: 'DELETE' }); selectedMedia.delete(m.id); } catch (e) { toast(e.message, 'err'); }
+    }
+    toast(list.length === 1 ? 'Deleted' : `${list.length} items deleted`);
+    await loadAll(); renderPage({ soft: true });
+    return true;
+  }
+
+  const FONT_HELP = 'Install the font on the server “for all users” (Windows: right-click the font file → Install for all users; Linux: copy it to /usr/local/share/fonts and run fc-cache -f), then click Re-convert. Fonts installed only for your own account are invisible to the KevCast service.';
+  function fontsAlert() {
+    const affected = state.media.filter((m) => m.type === 'presentation' && m.status === 'ready' && m.missingFonts?.length);
+    if (!affected.length) return null;
+    const names = [...new Set(affected.flatMap((m) => m.missingFonts))].sort();
+    return h('div', { class: 'alert', style: { marginBottom: '12px' } },
+      h('b', {}, `${affected.length} presentation${affected.length === 1 ? ' uses' : 's use'} fonts that aren’t installed on the server: `), names.join(', '), '. ',
+      'The slides were made with a replacement font, so text can look different or be misplaced. ', FONT_HELP, ' ',
+      h('button', { class: 'btn sm', onclick: async () => {
+        const r = await api('/media/reconvert-all', { method: 'POST', body: { onlyMissingFonts: true } });
+        toast(`Converting ${r.count} presentation${r.count === 1 ? '' : 's'} again…`); await loadAll(); renderPage({ soft: true });
+      } }, icon('refresh'), 'Re-convert these'));
+  }
+
   function MediaPage() {
     const filters = [['all', 'All'], ['image', 'Images'], ['video', 'Videos'], ['presentation', 'PowerPoint & PDF'], ['web', 'Web pages'], ['text', 'Text']];
     const q = state.mediaSearch.toLowerCase();
@@ -560,6 +598,14 @@
     const search = h('input', { type: 'search', placeholder: 'Search media…', value: state.mediaSearch,
       oninput: (e) => { state.mediaSearch = e.target.value; const pos = e.target.selectionStart; renderPage({ soft: true }); const s = document.querySelector('.toolbar input[type=search]'); s.focus(); s.setSelectionRange(pos, pos); } });
     setTimeout(drawUploads);
+    for (const id of [...selectedMedia]) if (!byId(state.media, id)) selectedMedia.delete(id);
+    const toggle = (m) => { selectedMedia.has(m.id) ? selectedMedia.delete(m.id) : selectedMedia.add(m.id); renderPage({ soft: true }); };
+    const selectionBar = () => selectedMedia.size ? h('div', { class: 'bulk-bar card' },
+      h('b', {}, `${selectedMedia.size} selected`),
+      h('button', { class: 'btn sm', onclick: () => { list.forEach((m) => selectedMedia.add(m.id)); renderPage({ soft: true }); } }, `Select all ${list.length}`),
+      h('button', { class: 'btn sm danger', onclick: () => deleteMedia(state.media.filter((m) => selectedMedia.has(m.id))) }, icon('trash'), 'Delete'),
+      h('div', { class: 'spacer' }),
+      h('button', { class: 'btn sm ghost', onclick: () => { selectedMedia.clear(); renderPage({ soft: true }); } }, 'Clear')) : null;
     return [
       pageHead('Media', 'Everything you can show on a screen.',
         h('button', { class: 'btn', onclick: () => webDialog() }, icon('web'), 'Web page'),
@@ -573,11 +619,18 @@
       h('div', { class: 'toolbar' },
         h('div', { class: 'chips' }, filters.map(([id, label]) => h('button', { class: `chip ${state.mediaFilter === id ? 'on' : ''}`, onclick: () => { state.mediaFilter = id; renderPage(); } }, label))),
         h('div', { class: 'spacer' }), search),
-      list.length ? h('div', { class: 'media-grid' }, list.map((m) =>
-        h('div', { class: 'card media-card', onclick: () => mediaDialog(m) },
+      fontsAlert(),
+      selectionBar(),
+      list.length ? h('div', { class: `media-grid ${selectedMedia.size ? 'selecting' : ''}` }, list.map((m) =>
+        h('div', { class: `card media-card ${selectedMedia.has(m.id) ? 'picked' : ''}`, onclick: () => (selectedMedia.size ? toggle(m) : mediaDialog(m)) },
+          h('label', { class: 'card-check', title: 'Select', onclick: (e) => e.stopPropagation() },
+            h('input', { type: 'checkbox', checked: selectedMedia.has(m.id), onchange: () => toggle(m) })),
+          h('button', { class: 'card-del', title: 'Delete', 'aria-label': `Delete ${m.name}`, onclick: (e) => { e.stopPropagation(); deleteMedia([m]); } }, icon('trash')),
           mediaThumb(m),
           h('div', { class: 'media-meta' }, h('div', { class: 'name', title: m.name }, m.name),
-            h('div', { class: 'muted small' }, m.status === 'processing' ? 'Converting slides…' : m.status === 'error' ? 'Conversion failed — click for details' : m.size ? fmtSize(m.size) : m.type === 'web' ? m.url : TYPE_LABEL[m.type]))))) :
+            m.missingFonts?.length && m.status === 'ready'
+              ? h('div', { class: 'small', style: { color: 'var(--warn)', fontWeight: 600 }, title: m.missingFonts.join(', ') }, `⚠ ${m.missingFonts.length} font${m.missingFonts.length === 1 ? '' : 's'} missing on the server`)
+              : h('div', { class: 'muted small' }, m.status === 'processing' ? 'Converting slides…' : m.status === 'error' ? 'Conversion failed — click for details' : m.size ? fmtSize(m.size) : m.type === 'web' ? m.url : TYPE_LABEL[m.type]))))) :
         h('div', { class: 'card empty' }, h('h3', {}, state.media.length ? 'No matches' : 'Your media library is empty'), h('p', {}, 'Upload a PowerPoint, some photos or a video to get started.')),
     ];
   }
@@ -613,6 +666,7 @@
       body: [
         big,
         m.status === 'error' ? h('div', { class: 'alert' }, h('b', {}, 'Conversion failed: '), m.error) : null,
+        m.missingFonts?.length && m.status === 'ready' ? h('div', { class: 'alert' }, h('b', {}, `Missing on the server: ${m.missingFonts.join(', ')}. `), 'These slides use a replacement font, so text can look different or be misplaced. ', FONT_HELP) : null,
         m.slideUrls && m.slideUrls.length > 1 ? h('div', { class: 'slides-strip' }, m.slideUrls.map((u) => h('img', { src: u, loading: 'lazy', onclick: () => big.replaceChildren(h('img', { src: u })) }))) : null,
         h('label', { class: 'field' }, 'Name', name),
         h('div', { class: 'muted small' },
@@ -620,11 +674,7 @@
         h('div', { class: 'small' }, usedIn.length ? ['Used in: ', usedIn.map((p, i) => [i ? ', ' : '', h('a', { href: `#/playlists/${p.id}` }, p.name)])] : h('span', { class: 'muted' }, 'Not used in any playlist yet.')),
       ],
       footer: (close) => [
-        h('button', { class: 'btn danger', onclick: async () => {
-          if (!(await confirmBox('Delete media?', `“${m.name}” will be removed from all playlists and screens.`))) return;
-          await api(`/media/${m.id}`, { method: 'DELETE' });
-          close(); toast('Deleted'); await loadAll(); renderPage();
-        } }, icon('trash'), 'Delete'),
+        h('button', { class: 'btn danger', onclick: async () => { if (await deleteMedia([m])) close(); } }, icon('trash'), 'Delete'),
         m.type === 'presentation' ? h('button', { class: 'btn', onclick: async () => { await api(`/media/${m.id}/reconvert`, { method: 'POST' }); close(); toast('Converting again…'); } }, icon('refresh'), 'Re-convert') : null,
         m.type === 'text' ? h('button', { class: 'btn', onclick: () => { close(); textDialog(m); } }, 'Edit text') : null,
         m.type === 'web' ? h('button', { class: 'btn', onclick: () => { close(); webDialog(m); } }, 'Edit web page') : null,
@@ -756,13 +806,21 @@
     go(`#/playlists/${p.id}`);
   }
 
+  async function deletePlaylist(p) {
+    const n = state.schedules.filter((s) => s.playlistId === p.id).length;
+    if (!(await confirmBox(`Delete playlist “${p.name}”?`, `${n ? `Its ${n} schedule entr${n === 1 ? 'y is' : 'ies are'} deleted too. ` : ''}Your media stays in the library.`))) return;
+    await api(`/playlists/${p.id}`, { method: 'DELETE' });
+    await loadAll(); go('#/playlists'); renderPage();
+  }
+
   function PlaylistsPage(arg) {
     const p = byId(state.playlists, arg) || state.playlists[0];
     const listCol = h('div', { class: 'card pl-list' },
       h('div', { class: 'section-head' }, h('h3', {}, 'Playlists'), h('div', { class: 'spacer' }), h('button', { class: 'btn sm primary', onclick: newPlaylist }, icon('plus'), 'New')),
       state.playlists.map((x) => h('a', { href: `#/playlists/${x.id}`, class: p && x.id === p.id ? 'active' : '' },
+        h('button', { class: 'btn icon sm row-del', title: 'Delete playlist', onclick: (e) => { e.preventDefault(); e.stopPropagation(); deletePlaylist(x); } }, icon('trash')),
         h('span', { class: 'swatch', style: { background: x.color } }),
-        h('div', { style: { minWidth: 0 } }, h('div', { style: { fontWeight: 600 } }, x.name), h('div', { class: 'muted small' }, `${x.items.length} items · ${playlistRuntime(x)}`)))));
+        h('div', { style: { minWidth: 0 } }, h('div', { style: { fontWeight: 600 } }, x.name), h('div', { class: 'muted small' }, `${x.items.length} items · ${playlistRuntime(x)}`, groupsForPlaylist(x).length ? ' · ▦ group' : '')))));
     if (!p) {
       return [pageHead('Playlists', 'A playlist is a set of content that plays in a loop.'),
         h('div', { class: 'card empty' }, h('h3', {}, 'No playlists yet'), h('p', {}, 'Create a playlist, then drag your media into it.'), h('button', { class: 'btn primary', onclick: newPlaylist }, icon('plus'), 'Create your first playlist'))];
@@ -782,7 +840,18 @@
     const runtime = h('span', { class: 'muted small' });
     const drawRuntime = () => { runtime.textContent = `${p.items.length} items · total ${playlistRuntime(p)}`; };
 
-    const name = h('input', { value: p.name, style: { fontSize: '17px', fontWeight: 700 }, oninput: () => { p.name = name.value; savePlaylist(p); } });
+    const groupNote = h('div', { class: 'group-note small' });
+    const drawGroupNote = () => {
+      const gs = groupsForPlaylist(p);
+      const screens = state.displays.filter((d) => d.approved && gs.some((g) => (d.groups || []).includes(g.name))).length;
+      groupNote.hidden = !gs.length && !state.groups.length;
+      groupNote.classList.toggle('on', gs.length > 0);
+      groupNote.replaceChildren(...(gs.length
+        ? [icon('group'), h('span', {}, h('b', {}, `Plays on group “${gs[0].name}”`), ` (${screens} screen${screens === 1 ? '' : 's'}) whenever nothing else is scheduled, because it has the same name.`)]
+        : [h('span', { class: 'muted' }, 'Tip: give this playlist the same name as a display group and that group plays it automatically.')]));
+    };
+    drawGroupNote();
+    const name = h('input', { value: p.name, style: { fontSize: '17px', fontWeight: 700 }, oninput: () => { p.name = name.value; savePlaylist(p); drawGroupNote(); } });
     const color = h('input', { type: 'color', value: p.color, title: 'Colour in the schedule', oninput: () => { p.color = color.value; savePlaylist(p); } });
     const defDur = h('input', { type: 'number', min: 1, value: p.defaultDuration || 10, style: { width: '80px' }, oninput: () => { p.defaultDuration = Number(defDur.value) || 10; savePlaylist(p); draw(); } });
     const trans = h('select', { style: { width: 'auto' }, onchange: () => { p.transition = trans.value; savePlaylist(p); } },
@@ -812,7 +881,11 @@
           h('div', { class: 'controls' },
             h('label', { class: 'row small muted', title: m?.type === 'presentation' ? 'Seconds per slide' : 'Seconds on screen' }, dur, m?.type === 'presentation' ? 's/slide' : 's'),
             h('label', { class: 'check small', title: 'Show this item' }, h('input', { type: 'checkbox', checked: it.enabled !== false, onchange: (e) => { it.enabled = e.target.checked; row.classList.toggle('disabled', !it.enabled); savePlaylist(p); drawRuntime(); } })),
-            h('button', { class: 'btn icon ghost', title: 'Remove from playlist', onclick: () => { p.items.splice(idx, 1); savePlaylist(p); draw(); } }, icon('trash'))));
+            h('button', { class: 'btn icon ghost row-del', title: 'Remove from this playlist (the file stays in Media)', onclick: () => {
+              const [gone] = p.items.splice(idx, 1); savePlaylist(p, true); draw();
+              toast(h('span', {}, `Removed “${m ? m.name : 'item'}” from the playlist. `,
+                h('a', { href: '#', onclick: (e) => { e.preventDefault(); p.items.splice(idx, 0, gone); savePlaylist(p, true); draw(); e.target.closest('.toast')?.remove(); } }, 'Undo')));
+            } }, icon('trash'))));
         row.addEventListener('dragstart', (e) => { dragFrom = idx; state.busy = true; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/kevcast-item', String(idx)); });
         row.addEventListener('dragend', () => { state.busy = false; dragFrom = null; draw(); });
         row.addEventListener('dragover', (e) => {
@@ -849,15 +922,12 @@
     return h('div', { class: 'card' },
       h('div', { class: 'section-head', style: { flexWrap: 'wrap' } }, color, h('div', { style: { flex: 1, minWidth: '180px' } }, name),
         h('button', { class: 'btn sm ghost', title: 'Duplicate', onclick: async () => { const c = await api(`/playlists/${p.id}/duplicate`, { method: 'POST' }); state.playlists.push(c); go(`#/playlists/${c.id}`); } }, icon('copy')),
-        h('button', { class: 'btn sm ghost danger', title: 'Delete playlist', onclick: async () => {
-          if (!(await confirmBox('Delete playlist?', `“${p.name}” and any schedules using it will be deleted. Your media stays in the library.`))) return;
-          await api(`/playlists/${p.id}`, { method: 'DELETE' });
-          await loadAll(); go('#/playlists'); renderPage();
-        } }, icon('trash'))),
+        h('button', { class: 'btn sm ghost danger', title: 'Delete playlist', onclick: () => deletePlaylist(p) }, icon('trash'))),
       h('div', { class: 'row wrap', style: { padding: '10px 16px', borderBottom: '1px solid var(--line)', gap: '16px' } },
         h('label', { class: 'row small' }, 'Default time', defDur, 'sec'),
         h('label', { class: 'row small' }, 'Transition', trans),
         h('div', { class: 'spacer' }), runtime),
+      groupNote,
       items);
   }
 
@@ -870,7 +940,9 @@
         const row = h('div', { class: 'lib-item', draggable: true, title: 'Drag into the playlist' },
           mediaThumb(m, true),
           h('div', { style: { minWidth: 0 } }, h('div', { class: 'name' }, m.name), h('div', { class: 'muted small' }, TYPE_LABEL[m.type])),
-          h('button', { class: 'btn icon sm', title: 'Add to end of playlist', onclick: () => p._addItem(m.id) }, icon('plus')));
+          h('div', { class: 'row', style: { gap: '4px' } },
+            h('button', { class: 'btn icon sm row-del', title: 'Delete from the library', onclick: () => deleteMedia([m]) }, icon('trash')),
+            h('button', { class: 'btn icon sm', title: 'Add to end of playlist', onclick: () => p._addItem(m.id) }, icon('plus'))));
         row.addEventListener('dragstart', (e) => { state.busy = true; e.dataTransfer.setData('text/kevcast-media', m.id); e.dataTransfer.effectAllowed = 'copy'; });
         row.addEventListener('dragend', () => { state.busy = false; });
         return row;
@@ -970,7 +1042,7 @@
     const approved = state.displays.filter((d) => d.approved);
     // The filter can be one screen or a whole group ("g:<name>").
     const filterGroup = (state.calDisplay || '').startsWith('g:') ? state.calDisplay.slice(2) : null;
-    const filterDisplay = filterGroup ? { id: '__group', name: filterGroup, groups: [filterGroup], defaultPlaylistId: null } : byId(state.displays, state.calDisplay);
+    const filterDisplay = filterGroup ? groupTarget(filterGroup) : asScheduled(byId(state.displays, state.calDisplay));
     const relevant = state.schedules.filter((s) => !filterDisplay || KevSchedule.appliesToDisplay(s, filterDisplay));
     const view = state.calView || 'calendar';
 
@@ -1088,7 +1160,7 @@
   /** One row per day showing exactly what a display plays (schedule + default + recurring items). */
   function weekOverview(days, display, picked, label) {
     const today = dkey(new Date());
-    const target = display || { id: '__none', groups: [], defaultPlaylistId: null };
+    const target = (display && display.id !== '__group' ? asScheduled(display) : display) || { id: '__none', groups: [], defaultPlaylistId: null };
     const ticks = [0, 3, 6, 9, 12, 15, 18, 21, 24];
     const pct = (m) => `${(m / 1440) * 100}%`;
     const rows = days.map((d) => {
@@ -1191,6 +1263,11 @@
       targets: { displays: [], groups: [] }, startDate: null, endDate: null, interval: null,
     }, initial)));
     s.targets = s.targets || { displays: [], groups: [] };
+    // Scheduling a playlist named after a group: aim it at that group.
+    if (!initial.id && !initial.targets && s.playlistId) {
+      const pl = byId(state.playlists, s.playlistId);
+      if (pl) s.targets.groups = groupsForPlaylist(pl).map((g) => g.name);
+    }
     const webPages = state.media.filter((m) => m.type === 'web');
     const mediaNow = s.mediaId ? byId(state.media, s.mediaId) : null;
     let what = s.mediaId ? (mediaNow?.type === 'web' ? 'web' : 'media') : (initial.what || 'playlist');
@@ -1499,8 +1576,14 @@
         h('button', { class: 'btn', onclick: () => groupDialog(g) }, icon('settings'), 'Edit group'),
         h('button', { class: 'btn primary', onclick: () => scheduleDialog({ targets: { displays: [], groups: [g.name] } }) }, icon('schedule'), 'Schedule for this group')),
       h('div', { class: 'row wrap', style: { marginBottom: '16px' } },
+        groupPlaylistFor(g.name)
+          ? h('a', { class: 'btn sm', href: `#/playlists/${groupPlaylistFor(g.name).id}`, title: 'This playlist has the same name as the group, so the group plays it whenever nothing else is scheduled' }, icon('playlist'), `Group playlist: ${groupPlaylistFor(g.name).name}`)
+          : h('button', { class: 'btn sm', title: 'A playlist with the same name as the group plays on it whenever nothing else is scheduled', onclick: async () => {
+            const pl = await api('/playlists', { method: 'POST', body: { name: g.name } });
+            await loadAll(); go(`#/playlists/${pl.id}`);
+          } }, icon('plus'), `Create playlist “${g.name}”`),
         h('button', { class: 'btn sm', onclick: () => sendDialog({ targets: { displays: [], groups: [g.name] } }) }, icon('play'), 'Send to group'),
-        h('button', { class: 'btn sm', onclick: () => bulkDefaultDialog({ group: g.name }, `the ${members.length} screens in “${g.name}”`) }, 'Set default playlist'),
+        groupPlaylistFor(g.name) ? null : h('button', { class: 'btn sm', onclick: () => bulkDefaultDialog({ group: g.name }, `the ${members.length} screens in “${g.name}”`) }, 'Set default playlist'),
         h('button', { class: 'btn sm', onclick: () => groupCommand(sel, 'identify', 'Identify') }, icon('eye'), 'Identify'),
         h('button', { class: 'btn sm', onclick: () => groupCommand(sel, 'reload', 'Reload') }, icon('refresh'), 'Reload'),
         others.length && entries.length ? h('button', { class: 'btn sm', onclick: () => copyScheduleDialog(g, entries.length) }, icon('copy'), 'Copy schedule to…') : null),
@@ -1520,7 +1603,9 @@
             h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset--; renderPage(); } }, icon('left')),
             h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset = 0; renderPage(); } }, 'This week'),
             h('button', { class: 'btn sm', onclick: () => { state.calWeekOffset++; renderPage(); } }, icon('right'))),
-          weekOverview(days, { id: '__group', name: g.name, groups: [g.name], defaultPlaylistId: null }, false, `Everything scheduled for “${g.name}”. When nothing is scheduled, each screen shows its own default playlist; schedules aimed at a single screen are not shown here.`))),
+          weekOverview(days, groupTarget(g.name), false, groupPlaylistFor(g.name)
+            ? `Everything scheduled for “${g.name}”. When nothing is scheduled, the group plays the playlist “${groupPlaylistFor(g.name).name}” (same name as the group). Schedules aimed at a single screen are not shown here.`
+            : `Everything scheduled for “${g.name}”. When nothing is scheduled, each screen shows its own default playlist. Tip: name a playlist “${g.name}” and this group plays it automatically. Schedules aimed at a single screen are not shown here.`))),
       h('h3', { style: { margin: '18px 0 0' } }, 'Schedule entries for this group'),
       scheduleTable(entries, { emptyText: 'Nothing is scheduled for this group yet. Click “Schedule for this group”.' }),
     ];
@@ -1707,6 +1792,7 @@
     if (!state.playlists.length) { toast('Create a playlist first.', 'err'); return go('#/playlists'); }
     const t = JSON.parse(JSON.stringify(targets || { displays: [], groups: [] }));
     let pid = playlistId || state.playlists[0].id;
+    if (!targets && byId(state.playlists, pid)) t.groups = groupsForPlaylist(byId(state.playlists, pid)).map((g) => g.name);
     let mode = 'default';
     const count = h('span', { class: 'muted small' });
     const resolveIds = () => {
@@ -1782,7 +1868,9 @@
         h('div', { class: 'np' }, d.online ? (np ? `▶ ${np.name}${np.slides ? ` · slide ${np.slide}/${np.slides}` : ''}` : 'Idle') : 'Not connected', shot ? h('span', { style: { float: 'right', opacity: 0.8 } }, `📷 ${ago(d.screenshotAt)}`) : null)),
       h('dl', { class: 'kv' },
         h('dt', {}, 'Now scheduled'), h('dd', {}, scheduled ? scheduled.name : '—', d.scheduleId ? '' : scheduled ? ' (default)' : ''),
-        h('dt', {}, 'Default'), h('dd', {}, playlistSelect(d.defaultPlaylistId, async (v) => { await api(`/displays/${d.id}`, { method: 'PATCH', body: { defaultPlaylistId: v } }); toast('Saved', 'ok'); })),
+        h('dt', {}, 'Default'), h('dd', {}, d.groupPlaylistId
+          ? h('a', { href: `#/playlists/${d.groupPlaylistId}`, title: 'A playlist with the same name as this screen’s group. Rename it to use the screen’s own default again.' }, `▦ ${byId(state.playlists, d.groupPlaylistId)?.name || ''} (group)`)
+          : playlistSelect(d.defaultPlaylistId, async (v) => { await api(`/displays/${d.id}`, { method: 'PATCH', body: { defaultPlaylistId: v } }); toast('Saved', 'ok'); })),
         h('dt', {}, 'Screen'), h('dd', {}, d.resolution || '—', d.ip ? ` · ${d.ip.replace('::ffff:', '')}` : ''),
         d.cache ? h('dt', {}, 'Offline') : null,
         d.cache ? h('dd', { title: 'Media stored on the device, so it keeps playing if the server goes down' },
@@ -1827,7 +1915,8 @@
       body: [
         h('label', { class: 'field' }, 'Name', h('input', { value: s.name, oninput: (e) => (s.name = e.target.value) })),
         h('div', { class: 'field' }, h('b', { class: 'small' }, 'Groups'), groupPicker(s.groups)),
-        h('label', { class: 'field' }, 'Default playlist', h('span', { class: 'hint' }, 'Plays whenever nothing else is scheduled'), playlistSelect(s.defaultPlaylistId, (v) => (s.defaultPlaylistId = v))),
+        h('label', { class: 'field' }, 'Default playlist', h('span', { class: 'hint' }, 'Plays whenever nothing else is scheduled'), playlistSelect(s.defaultPlaylistId, (v) => (s.defaultPlaylistId = v)),
+          d.groupPlaylistId ? h('span', { class: 'hint', style: { color: 'var(--warn)' } }, `This screen is in a group with its own playlist, “${byId(state.playlists, d.groupPlaylistId)?.name}”, so it plays that one instead.`) : null),
         h('div', { class: 'grid2' },
           h('div', { class: 'field' }, h('b', { class: 'small' }, 'Orientation'), segmented([['landscape', 'Landscape'], ['portrait-left', 'Portrait ⟲'], ['portrait-right', 'Portrait ⟳']], s.orientation || 'landscape', (v) => (s.orientation = v))),
           h('div', { class: 'field' }, h('b', { class: 'small' }, 'Image fit'), segmented([['contain', 'Fit (black bars)'], ['cover', 'Fill (crop)']], s.fit || 'contain', (v) => (s.fit = v)))),
@@ -1963,7 +2052,12 @@
           h('div', { class: 'card' }, h('div', { class: 'section-head' }, h('h2', {}, 'Server')),
             cap(o.capabilities.libreoffice, 'LibreOffice (PowerPoint conversion)', 'Install LibreOffice on the server to convert .pptx files. Windows: winget install TheDocumentFoundation.LibreOffice · macOS: brew install --cask libreoffice · Linux: apt install libreoffice-impress'),
             cap(o.capabilities.pdftoppm || o.capabilities.ghostscript, 'Slide renderer (Poppler / Ghostscript)', 'Windows: winget install oschwartz10612.Poppler · macOS: brew install poppler · Linux: apt install poppler-utils'),
-            h('div', { class: 'list-row' }, h('dl', { class: 'kv' }, h('dt', {}, 'Version'), h('dd', {}, o.version), h('dt', {}, 'Platform'), h('dd', {}, o.platform), h('dt', {}, 'Data folder'), h('dd', { title: o.dataDir }, o.dataDir)))),
+            h('div', { class: 'list-row' }, h('dl', { class: 'kv' }, h('dt', {}, 'Version'), h('dd', {}, o.version), h('dt', {}, 'Platform'), h('dd', {}, o.platform), h('dt', {}, 'Data folder'), h('dd', { title: o.dataDir }, o.dataDir))),
+            h('div', { class: 'list-row' }, h('div', { style: { flex: 1 } }, h('b', {}, 'Installed new fonts?'), h('div', { class: 'muted small' }, 'Convert every PowerPoint again so the slides use them.')),
+              h('button', { class: 'btn sm', onclick: async () => {
+                const r = await api('/media/reconvert-all', { method: 'POST', body: {} });
+                toast(`Converting ${r.count} presentation${r.count === 1 ? '' : 's'} again…`, 'ok');
+              } }, icon('refresh'), 'Re-convert all'))),
           isAdmin() ? rolloutCard(o) : null,
           isAdmin() ? h('div', { class: 'card pad stack' }, h('h2', {}, 'Backup'),
             h('p', { class: 'muted', style: { margin: 0 } }, 'The database without passwords or media files. For a full backup, copy the data folder.'),

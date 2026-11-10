@@ -11,6 +11,7 @@ const multer = require('multer');
 const Database = require('./db');
 const { createAuth } = require('./auth');
 const convert = require('./convert');
+const fonts = require('./fonts');
 const { resolve: resolveSchedule } = require('../shared/schedule');
 const pkg = require('../package.json');
 
@@ -163,10 +164,27 @@ function isOnline(d) {
   return (playerStreams.get(d.id)?.size || 0) > 0 || (d.lastSeen && Date.now() - new Date(d.lastSeen).getTime() < ONLINE_MS);
 }
 
+// A playlist named exactly like a display group (ignoring case) is that group's playlist: screens in
+// the group play it whenever nothing is scheduled, instead of their own default playlist.
+const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+function groupPlaylist(d) {
+  for (const g of d.groups || []) {
+    const p = db.list('playlists').find((x) => sameName(x.name, g));
+    if (p) return p;
+  }
+  return null;
+}
+const effectiveDefault = (d) => groupPlaylist(d)?.id || d.defaultPlaylistId || null;
+
 function publicDisplay(d) {
   const { token, ...rest } = d;
-  const now = resolveSchedule(db.list('schedules'), d, new Date());
-  return { ...rest, maintenance: maintenanceOf(d), online: isOnline(d), scheduledPlaylistId: now.playlistId, scheduledMediaId: now.mediaId, scheduleId: now.scheduleId };
+  const effectivePlaylistId = effectiveDefault(d);
+  const now = resolveSchedule(db.list('schedules'), { ...d, defaultPlaylistId: effectivePlaylistId }, new Date());
+  return {
+    ...rest, maintenance: maintenanceOf(d), online: isOnline(d),
+    groupPlaylistId: groupPlaylist(d)?.id || null, effectivePlaylistId,
+    scheduledPlaylistId: now.playlistId, scheduledMediaId: now.mediaId, scheduleId: now.scheduleId,
+  };
 }
 
 function detectType(filename, mimetype) {
@@ -191,8 +209,11 @@ function processPresentation(m) {
       // Drop the intermediate PDF LibreOffice leaves next to the slides.
       for (const f of fs.readdirSync(slidesDir)) if (f.endsWith('.pdf')) fs.rmSync(path.join(slidesDir, f));
       if (!db.get('media', m.id)) return;
-      db.update('media', m.id, { status: 'ready', slides, error: null });
-      toAdmins('media', { id: m.id, status: 'ready' });
+      return fonts.missingFonts(path.join(dir, m.file)).catch(() => []).then((missingFonts) => {
+        if (!db.get('media', m.id)) return;
+        db.update('media', m.id, { status: 'ready', slides, error: null, missingFonts });
+        toAdmins('media', { id: m.id, status: 'ready' });
+      });
     })
     .catch((err) => {
       console.error(`[convert] ${m.name}:`, err.message);
@@ -238,7 +259,8 @@ function expandSingle(mediaId) {
 function playerManifest(d) {
   const schedules = db.list('schedules').filter((s) => s.enabled !== false);
   const ids = new Set(schedules.filter((s) => s.playlistId).map((s) => s.playlistId));
-  if (d.defaultPlaylistId) ids.add(d.defaultPlaylistId);
+  const defaultId = effectiveDefault(d);
+  if (defaultId) ids.add(defaultId);
   const playlists = {};
   for (const id of ids) {
     const p = expandPlaylist(db.get('playlists', id));
@@ -251,6 +273,8 @@ function playerManifest(d) {
   }
   const { token, ...display } = d;
   display.maintenance = maintenanceOf(d);
+  display.ownDefaultPlaylistId = d.defaultPlaylistId || null;
+  display.defaultPlaylistId = defaultId; // the group's playlist, if one is named after a group
   return {
     serverVersion: pkg.version,
     orgName: db.data.settings.orgName,
@@ -555,6 +579,14 @@ admin.get('/media/:id/preview', (req, res) => {
   res.json(p);
 });
 
+// After installing fonts on the server: convert every presentation again.
+admin.post('/media/reconvert-all', (req, res) => {
+  const onlyMissing = !!req.body?.onlyMissingFonts;
+  const list = db.list('media').filter((m) => m.type === 'presentation' && m.status !== 'processing' && (!onlyMissing || (m.missingFonts || []).length));
+  for (const m of list) processPresentation(m);
+  res.json({ ok: true, count: list.length });
+});
+
 admin.post('/media/:id/reconvert', (req, res) => {
   const m = db.get('media', req.params.id);
   if (!m || m.type !== 'presentation') return bad(res, 'Not a presentation', 404);
@@ -794,6 +826,7 @@ function publicGroup(g) {
     members: members.length,
     online: members.filter(isOnline).length,
     schedules: db.list('schedules').filter((s) => (s.targets?.groups || []).includes(g.name)).length,
+    playlistId: db.list('playlists').find((p) => sameName(p.name, g.name))?.id || null,
   };
 }
 admin.get('/groups', (req, res) => res.json(db.list('groups').map(publicGroup)));
