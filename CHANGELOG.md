@@ -18,6 +18,10 @@ and versions follow [Semantic Versioning](https://semver.org/).
 - CI now really installs KevCast Server Setup on Windows, checks the service, firewall rules, shortcut and web server,
   and uninstalls it again (`packaging/windows/smoke-test.ps1`).
 
+### Changed
+- CI keeps build artifacts for 7 days (1 day for pull requests) instead of 90, so they no longer fill the account's
+  Actions storage. Releases keep their own copy of every installer.
+
 ## [0.2.2] - 2026-11-09
 ### Fixed
 - **macOS: "KevCast Studio/Player is damaged and can't be opened"** (Dutch: *"is beschadigd"*).

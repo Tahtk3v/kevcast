@@ -18,7 +18,7 @@ Players only talk to the server, never to the internet. An isolated signage netw
 ## Installers (recommended)
 
 Every component has its own installer, so you only install what a computer needs.
-Download them from the latest [Build workflow run](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml) (**Artifacts**), or build them yourself (see [packaging/README.md](../packaging/README.md)).
+Download them from the [latest release](https://github.com/tahtk3v/kevcast/releases/latest). Builds of the latest commit are under the latest [Build workflow run](https://github.com/tahtk3v/kevcast/actions/workflows/build.yml) (**Artifacts**, kept for 7 days), or build them yourself (see [packaging/README.md](../packaging/README.md)).
 
 | Component | Install it on | Windows | macOS | Linux / Raspberry Pi |
 |---|---|---|---|---|
