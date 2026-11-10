@@ -21,8 +21,8 @@
 
   <div id="pairing" class="screen" hidden>
     <div class="brand">KevCast</div>
-    <h1>Connect this screen</h1>
-    <p>Open the KevCast admin, go to <b>Displays</b> &rarr; <b>Add display</b> and enter this code:</p>
+    <h1 data-i18n>Connect this screen</h1>
+    <p data-i18n-html>Open the KevCast admin, go to <b>Displays</b> → <b>Add display</b> and enter this code:</p>
     <div id="pairCode" class="code">······</div>
     <p class="muted" id="pairServer"></p>
   </div>
@@ -31,13 +31,15 @@
     <div class="idle-time" id="idleTime"></div>
     <div class="idle-date" id="idleDate"></div>
     <div class="idle-org" id="idleOrg"></div>
-    <p class="muted" id="idleHint">Nothing is scheduled for this screen right now.</p>
+    <p class="muted" id="idleHint" data-i18n>Nothing is scheduled for this screen right now.</p>
   </div>
 
   <div id="identify" hidden></div>
   <div id="status" hidden></div>
 
+  <script src="/shared/i18n.js"></script>
   <script src="/shared/schedule.js"></script>
+  <script>KevI18n.translatePage()</script>
   <script src="player.js"></script>
 </body>
 </html>

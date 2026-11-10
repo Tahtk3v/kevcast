@@ -5,6 +5,9 @@
   const STORE = 'kevcast.player';
   const MANIFEST_CACHE = 'kevcast.manifest';
   const $ = (id) => document.getElementById(id);
+  // Translations follow the screen's own language (shared/i18n.js).
+  const tr = window.KevI18n ? window.KevI18n.t : (s) => s;
+  const LOCALE = window.KevI18n ? window.KevI18n.locale() : undefined;
 
   if (qs.has('reset')) {
     localStorage.removeItem(STORE);
@@ -73,7 +76,7 @@
         creds = await api('/api/player/register', { method: 'POST', body: JSON.stringify({ resolution: resolution(), userAgent: navigator.userAgent, provisioning }) });
         store(STORE, creds);
       } catch (e) {
-        setStatus('Cannot reach the KevCast server — retrying…');
+        setStatus(tr('Cannot reach the KevCast server — retrying…'));
         return setTimeout(boot, 5000);
       }
     }
@@ -94,7 +97,7 @@
       if (e.message === 'unpaired') return;
       // With saved content we keep playing quietly: no error banners on public screens.
       if (!manifest) {
-        setStatus('Cannot reach the KevCast server — retrying…');
+        setStatus(tr('Cannot reach the KevCast server — retrying…'));
         return setTimeout(refresh, 5000);
       }
     }
@@ -169,7 +172,7 @@
 
   function identify(name) {
     const el = $('identify');
-    el.textContent = name || 'This display';
+    el.textContent = name || tr('This display');
     el.hidden = false;
     clearTimeout(identify.t);
     identify.t = setTimeout(() => (el.hidden = true), 10000);
@@ -185,7 +188,7 @@
     $('pairing').hidden = !!d.approved;
     if (!d.approved) {
       $('pairCode').textContent = d.pairingCode || creds.pairingCode;
-      $('pairServer').textContent = `Server: ${location.host}`;
+      $('pairServer').textContent = tr('Server: {host}', { host: location.host });
       return;
     }
     $('clock').hidden = !d.showClock;
@@ -372,10 +375,10 @@
 
   function tickClock() {
     const now = new Date();
-    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = now.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
     $('clock').textContent = time;
     $('idleTime').textContent = time;
-    $('idleDate').textContent = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    $('idleDate').textContent = now.toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   async function keepAwake() {
@@ -407,9 +410,9 @@
       manifest.display.defaultPlaylistId = pl.id;
       applyDisplaySettings();
       evaluate(true);
-      if (!pl.items.length) $('idleHint').textContent = 'This playlist is empty (or its files are still processing).';
+      if (!pl.items.length) $('idleHint').textContent = tr('This playlist is empty (or its files are still processing).');
     } catch (e) {
-      setStatus('Preview failed — are you logged in to the admin?');
+      setStatus(tr('Preview failed — are you logged in to the admin?'));
     }
   }
 

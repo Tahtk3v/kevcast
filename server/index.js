@@ -302,7 +302,8 @@ app.get('/api/info', (req, res) => {
 });
 app.use('/admin', express.static(path.join(pub, 'admin')));
 app.use('/player', express.static(path.join(pub, 'player'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
-app.get('/shared/schedule.js', (req, res) => res.sendFile(path.join(__dirname, '..', 'shared', 'schedule.js')));
+// Code shared by the server, the Web Studio and the player: scheduling and translations.
+app.use('/shared', express.static(path.join(__dirname, '..', 'shared'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 app.use('/media', express.static(MEDIA_DIR, { maxAge: '7d', immutable: true }));
 
 // ---------------------------------------------------------------------------

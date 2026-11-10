@@ -331,7 +331,7 @@ Deleting a group never deletes screens. Schedule entries aimed **only** at that 
 
 
 Everyone sees:
-- **Your account**: your name and role, **Change password** (this signs you out on your other devices) and **Sign out**.
+- **Your account**: your name and role, **Language**, **Change password** (this signs you out on your other devices) and **Sign out**.
 - **Connect a screen**: the player addresses of this server, with copy buttons.
 - **Server**: whether LibreOffice and the slide renderer were found (with install hints), version, platform and data folder.
 
@@ -359,6 +359,18 @@ Give everyone who manages the screens their own account: **Settings → Users �
 - **Remove** a user to stop them signing in. What they made (media, playlists, schedules) stays.
 - There is always at least one administrator: the last one can't be removed or made an editor, and you can't remove yourself.
 - The same accounts work in KevCast Studio, the Web Studio in a browser and the API.
+
+### Language
+
+KevCast speaks **English, Dutch (Nederlands) and German (Deutsch)**. It follows the language of the computer
+(Windows, macOS or Linux, or the browser's language settings) automatically:
+
+- **Web Studio and KevCast Studio**: in the computer's language. Under **Settings → Your account → Language** you can
+  pick another one for that computer; *Automatic* goes back to the computer's language.
+- **Screens**: the pairing code screen and messages follow the language of the screen's own computer. Dates on the idle
+  clock use it too. Your content itself is never translated.
+- **The start page** of the server and the desktop apps' own menus and "connect to server" window follow it as well.
+- Any other language falls back to English.
 
 ## Tips for good-looking screens
 

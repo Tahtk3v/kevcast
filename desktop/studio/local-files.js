@@ -6,6 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { Readable } = require('stream');
 const { app, dialog, ipcMain, session, shell } = require('electron');
+const { t: tr } = require('../common/i18n');
 
 const EXTENSIONS = {
   presentation: ['.pptx', '.ppt', '.pps', '.ppsx', '.pot', '.potx', '.odp', '.key', '.pdf'],
@@ -13,11 +14,11 @@ const EXTENSIONS = {
   video: ['.mp4', '.webm', '.mov', '.m4v', '.ogv', '.mkv'],
 };
 const TYPE_OF = Object.fromEntries(Object.entries(EXTENSIONS).flatMap(([t, exts]) => exts.map((e) => [e, t])));
-const FILTERS = [
-  { name: 'Everything KevCast can show', extensions: Object.values(EXTENSIONS).flat().map((e) => e.slice(1)) },
-  { name: 'PowerPoint & PDF', extensions: EXTENSIONS.presentation.map((e) => e.slice(1)) },
-  { name: 'Images', extensions: EXTENSIONS.image.map((e) => e.slice(1)) },
-  { name: 'Videos', extensions: EXTENSIONS.video.map((e) => e.slice(1)) },
+const filters = () => [
+  { name: tr('Everything KevCast can show'), extensions: Object.values(EXTENSIONS).flat().map((e) => e.slice(1)) },
+  { name: tr('PowerPoint & PDF'), extensions: EXTENSIONS.presentation.map((e) => e.slice(1)) },
+  { name: tr('Images'), extensions: EXTENSIONS.image.map((e) => e.slice(1)) },
+  { name: tr('Videos'), extensions: EXTENSIONS.video.map((e) => e.slice(1)) },
 ];
 
 function fileInfo(p) {
@@ -41,19 +42,19 @@ function places(recent) {
     try { p = app.getPath(key); } catch {}
     return !p || p === os.homedir() ? path.join(os.homedir(), folder) : p;
   };
-  add('Desktop', special('desktop', 'Desktop'), 'desktop');
-  add('Documents', special('documents', 'Documents'), 'documents');
-  add('Downloads', special('downloads', 'Downloads'), 'downloads');
-  add('Pictures', special('pictures', 'Pictures'), 'pictures');
-  add('Videos', special('videos', 'Videos'), 'videos');
+  add(tr('Desktop'), special('desktop', 'Desktop'), 'desktop');
+  add(tr('Documents'), special('documents', 'Documents'), 'documents');
+  add(tr('Downloads'), special('downloads', 'Downloads'), 'downloads');
+  add(tr('Pictures'), special('pictures', 'Pictures'), 'pictures');
+  add(tr('Videos'), special('videos', 'Videos'), 'videos');
   // OneDrive (personal and business) on Windows, and cloud folders on macOS.
   for (const v of ['OneDrive', 'OneDriveCommercial', 'OneDriveConsumer']) add(v === 'OneDrive' ? 'OneDrive' : v.replace('OneDrive', 'OneDrive '), process.env[v], 'cloud');
   try {
     for (const d of fs.readdirSync(os.homedir())) if (/^OneDrive/i.test(d)) add(d, path.join(os.homedir(), d), 'cloud');
   } catch {}
-  add('Home', os.homedir(), 'home');
+  add(tr('Home'), os.homedir(), 'home');
   if (process.platform === 'win32') {
-    for (const letter of 'CDEFGHIJ') add(`Drive ${letter}:`, `${letter}:\\`, 'drive');
+    for (const letter of 'CDEFGHIJ') add(tr('Drive {letter}:', { letter }), `${letter}:\\`, 'drive');
   } else if (process.platform === 'darwin') {
     try { for (const v of fs.readdirSync('/Volumes')) add(v, path.join('/Volumes', v), 'drive'); } catch {}
   } else {
@@ -113,8 +114,8 @@ async function uploadFile(serverUrl, cookie, file, onProgress) {
     duplex: 'half',
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || `Upload failed (${res.status})`);
-  if (json.rejected && json.rejected.length) throw new Error('This file type is not supported');
+  if (!res.ok) throw new Error(json.error || tr('Upload failed ({status})', { status: res.status }));
+  if (json.rejected && json.rejected.length) throw new Error(tr('This file type is not supported'));
   return json.created || [];
 }
 
@@ -147,16 +148,16 @@ function registerLocalFiles({ getServer, getWindow, config }) {
     try {
       return listDir(dir);
     } catch (err) {
-      return { error: err.code === 'EACCES' || err.code === 'EPERM' ? 'No permission to open this folder' : err.message, path: dir };
+      return { error: err.code === 'EACCES' || err.code === 'EPERM' ? tr('No permission to open this folder') : err.message, path: dir };
     }
   }));
   ipcMain.handle('studio:pick-files', guard(async () => {
     const cfg = config.load();
     const r = await dialog.showOpenDialog(getWindow(), {
-      title: 'Choose files to upload to KevCast',
+      title: tr('Choose files to upload to KevCast'),
       defaultPath: cfg.lastFolder || app.getPath('documents'),
       properties: ['openFile', 'multiSelections'],
-      filters: FILTERS,
+      filters: filters(),
     });
     if (r.canceled || !r.filePaths.length) return [];
     remember(path.dirname(r.filePaths[0]));
@@ -164,7 +165,7 @@ function registerLocalFiles({ getServer, getWindow, config }) {
   }));
   ipcMain.handle('studio:pick-folder', guard(async () => {
     const cfg = config.load();
-    const r = await dialog.showOpenDialog(getWindow(), { title: 'Open a folder', defaultPath: cfg.lastFolder || app.getPath('documents'), properties: ['openDirectory'] });
+    const r = await dialog.showOpenDialog(getWindow(), { title: tr('Open a folder'), defaultPath: cfg.lastFolder || app.getPath('documents'), properties: ['openDirectory'] });
     if (r.canceled || !r.filePaths.length) return null;
     remember(r.filePaths[0]);
     return r.filePaths[0];

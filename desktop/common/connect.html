@@ -33,19 +33,19 @@
 <body>
   <div class="card">
     <div class="logo"><div class="mark"></div><span id="appName">KevCast</span></div>
-    <div class="muted" id="intro">Choose the KevCast server to connect to.</div>
+    <div class="muted" id="intro" data-i18n>Choose the KevCast server to connect to.</div>
 
-    <h2>Servers found on your network</h2>
-    <div class="servers" id="servers"><div class="muted"><span class="spin"></span>Searching…</div></div>
-    <div class="foot"><button class="link" id="rescan">Search again</button><span class="muted" id="current"></span></div>
+    <h2 data-i18n>Servers found on your network</h2>
+    <div class="servers" id="servers"><div class="muted"><span class="spin"></span><span data-i18n>Searching…</span></div></div>
+    <div class="foot"><button class="link" id="rescan" data-i18n>Search again</button><span class="muted" id="current"></span></div>
 
-    <h2>Or enter the address</h2>
+    <h2 data-i18n>Or enter the address</h2>
     <form class="row" id="manual">
       <input id="url" placeholder="e.g. 192.168.1.20 or kevcast.company.local:8080" autocomplete="off" spellcheck="false">
-      <button class="primary" type="submit">Connect</button>
+      <button class="primary" type="submit" data-i18n>Connect</button>
     </form>
     <div class="err" id="err"></div>
-    <div class="foot"><span class="muted" id="hint"></span><button class="link" id="cancel" hidden>Cancel</button></div>
+    <div class="foot"><span class="muted" id="hint"></span><button class="link" id="cancel" hidden data-i18n>Cancel</button></div>
   </div>
   <script src="connect.js"></script>
 </body>

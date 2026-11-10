@@ -21,6 +21,7 @@ const { OfflineCache } = require('./offline-cache');
 const { execFile } = require('child_process');
 const { createConfig } = require('../common/config');
 const { openConnectWindow } = require('../common/connect-window');
+const { t: tr } = require('../common/i18n');
 
 app.setName('KevCast Player');
 app.setPath('userData', path.join(app.getPath('appData'), 'KevCast Player'));
@@ -224,8 +225,8 @@ function nightlyRefresh() {
 function showConnect(autoConnect) {
   openConnectWindow({
     appName: 'KevCast Player',
-    intro: 'This screen is not connected yet. Pick your KevCast server — after that, everything is managed from the admin.',
-    hint: 'Ctrl+Shift+K opens this screen again later.',
+    intro: tr('This screen is not connected yet. Pick your KevCast server — after that, everything is managed from the admin.'),
+    hint: tr('Ctrl+Shift+K opens this screen again later.'),
     current: cfg.server,
     autoConnect,
     canCancel: !!win,

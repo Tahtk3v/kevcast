@@ -2,6 +2,12 @@
 const path = require('path');
 const { BrowserWindow, ipcMain } = require('electron');
 const { discover, normaliseUrl, check } = require('./discovery');
+const { t: tr, strings } = require('./i18n');
+
+// Text shown by connect.html / connect.js, translated here because that window has no server yet.
+const UI = ['Connect to KevCast', 'Choose the KevCast server to connect to.', 'Servers found on your network', 'Searching…', 'Search again',
+  'Or enter the address', 'e.g. 192.168.1.20 or kevcast.company.local:8080', 'Connect', 'Cancel', 'Could not connect',
+  'No servers found automatically. Enter the address below (shown on the server when it starts).', 'KevCast server', 'Connect →', 'Current: {url}'];
 
 let opts = null;
 let win = null;
@@ -13,14 +19,16 @@ ipcMain.handle('connect:info', () => ({
   current: opts.current,
   autoConnect: opts.autoConnect,
   canCancel: opts.canCancel,
+  strings: strings(UI),
+  lang: require('./i18n').lang(),
 }));
 ipcMain.handle('connect:discover', () => discover());
 ipcMain.handle('connect:cancel', () => win && win.close());
 ipcMain.handle('connect:connect', async (e, input) => {
   const url = normaliseUrl(input);
-  if (!url) return { ok: false, error: 'That does not look like a valid address.' };
+  if (!url) return { ok: false, error: tr('That does not look like a valid address.') };
   const r = await check(url);
-  if (!r.ok) return { ok: false, error: `Could not reach a KevCast server at ${url}: ${r.error}` };
+  if (!r.ok) return { ok: false, error: tr('Could not reach a KevCast server at {url}: {error}', { url, error: r.error }) };
   const w = win;
   win = null;
   await opts.onConnected(url);

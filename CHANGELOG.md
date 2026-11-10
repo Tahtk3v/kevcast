@@ -7,6 +7,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [0.4.0] - 2026-11-10
 ### Added
+- **Dutch and German.** The Web Studio, KevCast Studio, the player screens, the start page and the desktop apps' menus and
+  connect window follow the computer's language: English, Nederlands or Deutsch. **Settings → Your account → Language**
+  picks another language for that computer. `npm test` checks that every text is translated.
 - **A playlist for each group.** Name a playlist exactly like a display group and every screen in that group plays it
   whenever nothing is scheduled. You don't need a schedule entry or a default per screen.
   - The playlist editor says *Plays on group “…”*, and the group page has **Group playlist** or **Create playlist “…”**.
