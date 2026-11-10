@@ -62,7 +62,7 @@ Upgrade by running a newer installer over the old one. Uninstall via *Settings â
 ### Linux: kevcast-server .deb
 
 ```bash
-sudo apt install ./kevcast-server_0.2.3_amd64.deb     # arm64 for Raspberry Pi 4/5
+sudo apt install ./kevcast-server_0.3.0_amd64.deb     # arm64 for Raspberry Pi 4/5
 ```
 `apt` pulls in LibreOffice, Poppler and matching fonts automatically. The package:
 - installs to `/opt/kevcast-server` and creates the `kevcast` system user
@@ -173,7 +173,7 @@ See [Configuration](configuration.md) for all environment variables.
 ![First run](images/setup.png)
 
 
-Open **KevCast Web Studio**, the desktop icon or `http://<server-address>:8080/admin/`. The first visit asks you to create the administrator account and
+Open **KevCast Web Studio**, the desktop icon or `http://<server-address>:8080/admin/`. The first visit asks you to create the first administrator account and
 name your organisation. That name is shown on idle screens and in the apps' server list.
 
 Opening the server address without a path, `http://<server-address>:8080/`, shows a start page.

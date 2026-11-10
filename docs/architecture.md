@@ -24,7 +24,7 @@
 |---|---|
 | `server/index.js` | Express app: static files, admin API, player API, SSE hubs, UDP discovery |
 | `server/db.js` | JSON-file database with atomic writes (`db.json.tmp` → rename) and change listeners |
-| `server/auth.js` | One admin account (scrypt-hashed password) and an HMAC-signed session cookie |
+| `server/auth.js` | User accounts (scrypt-hashed passwords), roles and an HMAC-signed session cookie |
 | `server/convert.js` | Finds LibreOffice/Poppler/Ghostscript and converts presentations. Conversions run one at a time. |
 | `shared/schedule.js` | Schedule resolution (UMD). Used by the server, the admin and the player. |
 | `public/admin/` | Admin single-page app with no build step |
@@ -36,7 +36,8 @@
 ## Data model (`db.json`)
 
 ```js
-settings:  { orgName, adminUser: { username, salt, hash }, provisioningKey, serverId }
+settings:  { orgName, provisioningKey, serverId }
+users:     { id, username, name, role: 'admin'|'editor', salt, hash, sv, lastLogin }
 media:     { id, name, type: 'image'|'video'|'presentation'|'web'|'text', file, slides[], url, zoom, refreshSeconds, text{}, status, error, size }
 playlists: { id, name, color, defaultDuration, transition, items: [{ id, mediaId, duration, transition, enabled, mute }] }
 schedules: { id, name, playlistId | mediaId, itemDuration, enabled, priority, repeat: 'weekly'|'monthly'|'once',
@@ -122,13 +123,14 @@ A client sends the UDP datagram `KEVCAST_DISCOVER` to port 41234 on:
 
 Each server replies to the sender with JSON:
 ```json
-{ "kevcast": true, "id": "server-instance-id", "name": "Acme HQ", "version": "0.2.3", "port": 8080, "urls": ["http://192.168.1.20:8080"] }
+{ "kevcast": true, "id": "server-instance-id", "name": "Acme HQ", "version": "0.3.0", "port": 8080, "urls": ["http://192.168.1.20:8080"] }
 ```
 The client uses the address the reply came from, de-duplicates by `id`, and prefers a LAN address over loopback.
 
 ## Security model
 
-- **Admin**: one account. The password is hashed with scrypt (random salt). Sessions use an HMAC-SHA256 signed cookie (`HttpOnly`, `SameSite=Lax`, 14 days) keyed by `data/secret.key`. Logins are rate-limited to 10 failures per IP per 15 minutes.
+- **Users**: each has a role. *Administrators* can do everything; *Editors* can't manage users, change server settings, see the provisioning key or download backups (enforced by the server, `403`). There is always at least one administrator.
+- **Passwords** are hashed with scrypt (random salt). Sessions use an HMAC-SHA256 signed cookie (`HttpOnly`, `SameSite=Lax`, 14 days) keyed by `data/secret.key`, holding the user id and a session version (`sv`). Changing a user's password or role, or removing the user, raises or removes it, which ends that user's sessions at once. Logins are rate-limited to 10 failures per IP per 15 minutes.
 - **Players**: a random 192-bit token per display, used only for the player API. Removing a display revokes its token at once.
 - **Pairing**: a 6-character code from a 32-symbol alphabet, valid only while unpaired. Stale unpaired registrations are removed after 7 days.
 - **Provisioning key**: 96-bit random, compared in constant time. It only creates approved displays.

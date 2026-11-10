@@ -6,7 +6,8 @@ const path = require('path');
 const crypto = require('crypto');
 
 const EMPTY = () => ({
-  settings: { orgName: 'KevCast', adminUser: null },
+  settings: { orgName: 'KevCast' },
+  users: [],
   media: [],
   playlists: [],
   displays: [],

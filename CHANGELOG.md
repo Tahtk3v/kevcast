@@ -5,18 +5,26 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.2.3] - 2026-11-10
+## [0.3.0] - 2026-11-10
+### Added
+- **Users and roles.** Administrators add accounts for colleagues under **Settings → Users**:
+  - **Editor**: media, playlists, schedules, displays and groups.
+  - **Administrator**: also users, the organisation name, the roll-out key and backups.
+  - Edit a user to rename them, change their role or set a new password; remove users who left. There is always at least one administrator.
+  - Changing your password signs you out on your other devices. A new password or role for someone else signs them out everywhere.
+  - The sidebar shows who is signed in. Usernames are not case-sensitive.
+  - The existing administrator account becomes the first administrator when you upgrade; its password stays the same.
+- API: `/api/users` (administrators only). See [docs/api.md](docs/api.md).
+- Windows: `/NOLIBREOFFICE` for KevCast Setup, so a silent install (`/S /NOLIBREOFFICE`) skips the LibreOffice download.
+- CI now really installs KevCast Server Setup on Windows, checks the service, firewall rules, shortcut and web server,
+  and uninstalls it again (`packaging/windows/smoke-test.ps1`).
+
 ### Fixed
 - **Windows: KevCast Setup failed with "The KevCast Server service could not be registered (code 1)"**.
   - The service script stored the scheduled-task action in `$action`. PowerShell names are case-insensitive, so that
     was the script's own `-Action` parameter, which only accepts install/uninstall/stop/start, and the assignment failed.
   - The program files were installed, but the server never started.
 - In a silent install (`/S`), message boxes no longer wait for a click, and a failed service registration now gives exit code 2.
-
-### Added
-- `/NOLIBREOFFICE` for KevCast Setup, so a silent install (`/S /NOLIBREOFFICE`) skips the LibreOffice download.
-- CI now really installs KevCast Server Setup on Windows, checks the service, firewall rules, shortcut and web server,
-  and uninstalls it again (`packaging/windows/smoke-test.ps1`).
 
 ### Changed
 - CI keeps build artifacts for 7 days (1 day for pull requests) instead of 90, so they no longer fill the account's

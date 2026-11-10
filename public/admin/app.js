@@ -30,6 +30,7 @@
     schedule: '<path d="M19 4h-1V2h-2v2H8V2H6v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 16H5V10h14zM7 12h5v5H7z"/>',
     display: '<path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7v2H8v2h8v-2h-2v-2h7a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18z"/>',
     settings: '<path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.38 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>',
+    user: '<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4z"/>',
     plus: '<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/>',
     upload: '<path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>',
     image: '<path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5z"/>',
@@ -110,12 +111,15 @@
   };
 
   async function loadAll() {
-    const [media, playlists, schedules, displays, overview, groups] = await Promise.all([
+    const [media, playlists, schedules, displays, overview, groups, users] = await Promise.all([
       api('/media'), api('/playlists'), api('/schedules'), api('/displays'), api('/overview'), api('/groups'),
+      isAdmin() ? api('/users') : [],
     ]);
-    Object.assign(state, { media, playlists, schedules, displays, overview, groups });
+    Object.assign(state, { media, playlists, schedules, displays, overview, groups, users });
   }
 
+  const isAdmin = () => state.session?.user?.role === 'admin';
+  const ROLE_LABEL = { admin: 'Administrator', editor: 'Editor' };
   const byId = (list, id) => list.find((x) => x.id === id);
   const playlistColor = (id) => (byId(state.playlists, id) || {}).color || '#64748b';
 
@@ -181,7 +185,9 @@
         h('aside', { class: 'sidebar' },
           h('div', { class: 'logo' }, h('div', { class: 'logo-mark' }, icon('display')), 'KevCast'),
           h('nav', { class: 'nav' }, ROUTES.map(([id, label, ic]) => h('a', { href: `#/${id}`, 'data-id': id }, icon(ic), label, h('span', { class: 'badge', hidden: true })))),
-          h('div', { class: 'sidebar-foot' }, `${state.session.orgName} · v${state.session.version}`)),
+          h('div', { class: 'sidebar-foot' },
+            h('div', { class: 'sidebar-user', title: `${state.session.user.username} · ${ROLE_LABEL[state.session.user.role]}` }, icon('user'), state.session.user.name),
+            `${state.session.orgName} · v${state.session.version}`)),
         h('main', { class: 'main', id: 'page' }));
       app.replaceChildren(shell);
     }
@@ -268,7 +274,7 @@
       h('form', { class: 'card auth-card', onsubmit: submit },
         h('div', { class: 'logo' }, h('div', { class: 'logo-mark' }, icon('display')), 'KevCast'),
         h('h2', {}, setup ? 'Welcome! Let’s set up your server' : 'Sign in'),
-        setup ? h('p', { class: 'muted' }, 'Create the administrator account. You can change the password later in Settings.') : null,
+        setup ? h('p', { class: 'muted' }, 'Create the first administrator account. You can add more users later in Settings → Users.') : null,
         setup ? h('label', { class: 'field' }, 'Organisation name', org) : null,
         h('label', { class: 'field' }, 'Username', user),
         h('label', { class: 'field' }, setup ? 'Choose a password' : 'Password', setup ? h('span', { class: 'hint' }, 'At least 6 characters') : null, pass),
@@ -1872,8 +1878,61 @@
         } }, 'New key')));
   }
 
+  function userDialog(u) {
+    const isNew = !u;
+    const s = { username: u?.username || '', name: u?.name || '', role: u?.role || 'editor' };
+    const username = h('input', { value: s.username, autocomplete: 'off', disabled: !isNew, oninput: (e) => (s.username = e.target.value) });
+    const name = h('input', { value: s.name, placeholder: 'e.g. Sam from Marketing', oninput: (e) => (s.name = e.target.value) });
+    const pass = h('input', { type: 'password', autocomplete: 'new-password', placeholder: isNew ? '' : 'Leave empty to keep the current password' });
+    const role = h('select', { onchange: (e) => (s.role = e.target.value) },
+      Object.entries(ROLE_LABEL).map(([v, l]) => h('option', { value: v, selected: v === s.role }, l)));
+    modal({
+      title: isNew ? 'Add a user' : `Edit ${u.name}`,
+      body: h('div', { class: 'stack' },
+        h('div', { class: 'grid2' },
+          h('label', { class: 'field' }, 'Username', h('span', { class: 'hint' }, 'Used to sign in. No spaces.'), username),
+          h('label', { class: 'field' }, 'Full name', h('span', { class: 'hint' }, 'Optional'), name)),
+        h('div', { class: 'grid2' },
+          h('label', { class: 'field' }, isNew ? 'Password' : 'New password', h('span', { class: 'hint' }, 'At least 6 characters'), pass),
+          h('label', { class: 'field' }, 'Role', role)),
+        h('div', { class: 'muted small' },
+          h('div', {}, h('b', {}, 'Editor: '), 'media, playlists, schedules, displays and groups.'),
+          h('div', {}, h('b', {}, 'Administrator: '), 'everything, plus users, the organisation name, the roll-out key and backups.'))),
+      footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, 'Cancel'),
+        h('button', { class: 'btn primary', onclick: async () => {
+          try {
+            if (isNew) await api('/users', { method: 'POST', body: { username: s.username.trim(), name: s.name, role: s.role, password: pass.value } });
+            else await api(`/users/${u.id}`, { method: 'PATCH', body: { name: s.name, role: s.role, password: pass.value } });
+          } catch (e) { toast(e.message, 'err'); return; }
+          close();
+          toast(isNew ? `${s.name || s.username} can now sign in` : 'Saved', 'ok');
+          if (u && u.id === state.session.user.id) state.session = await api('/session');
+          await loadAll(); renderShell();
+        } }, isNew ? 'Add user' : 'Save')],
+    });
+  }
+
+  function usersCard() {
+    const me = state.session.user;
+    return h('div', { class: 'card' },
+      h('div', { class: 'section-head' }, h('h2', {}, 'Users'), h('div', { class: 'spacer' }),
+        h('button', { class: 'btn sm primary', onclick: () => userDialog() }, icon('plus'), 'Add user')),
+      state.users.map((u) => h('div', { class: 'list-row' },
+        h('div', { style: { minWidth: 0, flex: 1 } },
+          h('b', {}, u.name), u.id === me.id ? h('span', { class: 'muted small' }, ' (you)') : null,
+          h('div', { class: 'muted small' }, u.username, ' · ', u.lastLogin ? `last signed in ${ago(u.lastLogin)}` : 'never signed in')),
+        h('span', { class: `badge ${u.role === 'admin' ? '' : 'ok'}` }, ROLE_LABEL[u.role]),
+        h('button', { class: 'btn sm', onclick: () => userDialog(u) }, 'Edit'),
+        u.id === me.id ? null : h('button', { class: 'btn sm danger', title: 'Remove', onclick: async () => {
+          if (!(await confirmBox(`Remove ${u.name}?`, `${u.name} can no longer sign in. Their media, playlists and schedules stay.`, 'Remove'))) return;
+          try { await api(`/users/${u.id}`, { method: 'DELETE' }); } catch (e) { toast(e.message, 'err'); return; }
+          await loadAll(); renderPage();
+        } }, icon('trash')))));
+  }
+
   function SettingsPage() {
     const o = state.overview;
+    const me = state.session.user;
     const org = h('input', { value: state.session.orgName });
     const cur = h('input', { type: 'password', autocomplete: 'current-password' });
     const nxt = h('input', { type: 'password', autocomplete: 'new-password' });
@@ -1882,14 +1941,19 @@
       pageHead('Settings', null),
       h('div', { class: 'dash-cols', style: { marginTop: 0 } },
         h('div', { class: 'stack' },
-          h('div', { class: 'card pad stack' }, h('h2', {}, 'General'),
+          isAdmin() ? h('div', { class: 'card pad stack' }, h('h2', {}, 'General'),
             h('label', { class: 'field' }, 'Organisation name', h('span', { class: 'hint' }, 'Shown on idle screens'), org),
-            h('div', {}, h('button', { class: 'btn primary', onclick: async () => { await api('/settings', { method: 'PATCH', body: { orgName: org.value } }); state.session.orgName = org.value; toast('Saved', 'ok'); } }, 'Save'))),
-          h('div', { class: 'card pad stack' }, h('h2', {}, 'Change password'),
+            h('div', {}, h('button', { class: 'btn primary', onclick: async () => { await api('/settings', { method: 'PATCH', body: { orgName: org.value } }); state.session.orgName = org.value; toast('Saved', 'ok'); } }, 'Save'))) : null,
+          isAdmin() ? usersCard() : null,
+          h('div', { class: 'card pad stack' }, h('h2', {}, 'Your account'),
+            h('div', { class: 'muted' }, h('b', {}, me.name), ` (${me.username}) · ${ROLE_LABEL[me.role]}`),
             h('div', { class: 'grid2' }, h('label', { class: 'field' }, 'Current password', cur), h('label', { class: 'field' }, 'New password', nxt)),
-            h('div', {}, h('button', { class: 'btn', onclick: async () => {
-              try { await api('/password', { method: 'POST', body: { current: cur.value, next: nxt.value } }); cur.value = nxt.value = ''; toast('Password changed', 'ok'); } catch (e) { toast(e.message, 'err'); }
-            } }, 'Change password'))),
+            h('div', { class: 'row wrap' },
+              h('button', { class: 'btn', onclick: async () => {
+                try { await api('/password', { method: 'POST', body: { current: cur.value, next: nxt.value } }); cur.value = nxt.value = ''; toast('Password changed. Other devices are signed out.', 'ok'); } catch (e) { toast(e.message, 'err'); }
+              } }, 'Change password'),
+              h('div', { class: 'spacer' }),
+              h('button', { class: 'btn danger', onclick: async () => { await api('/logout', { method: 'POST' }); state.session.user = null; render(); } }, 'Sign out'))),
           h('div', { class: 'card pad stack' }, h('h2', {}, 'Connect a screen'),
             h('p', { class: 'muted', style: { margin: 0 } }, 'Open one of these addresses in the browser of the screen. For a kiosk setup see the install scripts in the install/player folder.'),
             (o.playerUrls.length ? o.playerUrls : [`${location.origin}/player/`]).map((u) => h('div', { class: 'urlbox' }, h('span', { style: { flex: 1 } }, u),
@@ -1900,11 +1964,10 @@
             cap(o.capabilities.libreoffice, 'LibreOffice (PowerPoint conversion)', 'Install LibreOffice on the server to convert .pptx files. Windows: winget install TheDocumentFoundation.LibreOffice · macOS: brew install --cask libreoffice · Linux: apt install libreoffice-impress'),
             cap(o.capabilities.pdftoppm || o.capabilities.ghostscript, 'Slide renderer (Poppler / Ghostscript)', 'Windows: winget install oschwartz10612.Poppler · macOS: brew install poppler · Linux: apt install poppler-utils'),
             h('div', { class: 'list-row' }, h('dl', { class: 'kv' }, h('dt', {}, 'Version'), h('dd', {}, o.version), h('dt', {}, 'Platform'), h('dd', {}, o.platform), h('dt', {}, 'Data folder'), h('dd', { title: o.dataDir }, o.dataDir)))),
-          rolloutCard(o),
-          h('div', { class: 'card pad stack' }, h('h2', {}, 'Account'),
-            h('div', { class: 'row wrap' },
-              h('a', { class: 'btn', href: '/api/backup' }, 'Download backup (JSON)'),
-              h('button', { class: 'btn danger', onclick: async () => { await api('/logout', { method: 'POST' }); state.session.user = null; render(); } }, 'Sign out'))))),
+          isAdmin() ? rolloutCard(o) : null,
+          isAdmin() ? h('div', { class: 'card pad stack' }, h('h2', {}, 'Backup'),
+            h('p', { class: 'muted', style: { margin: 0 } }, 'The database without passwords or media files. For a full backup, copy the data folder.'),
+            h('div', {}, h('a', { class: 'btn', href: '/api/backup' }, 'Download backup (JSON)'))) : null)),
     ];
   }
 

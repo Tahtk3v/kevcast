@@ -5,7 +5,7 @@
 ### Windows setup: "The KevCast Server service could not be registered (code 1)"
 The details show *"The variable cannot be validated because the value … is not a valid value for the Action variable"*.
 This was a bug in KevCast Setup 0.2.2: the program files were installed, but the background service wasn't
-registered, so the server didn't start. Run **KevCast Setup 0.2.3 or later** over it. Your data is kept.
+registered, so the server didn't start. Run **KevCast Setup 0.3.0 or later** over it. Your data is kept.
 
 ### The admin page doesn't open
 - Check the server is running:
@@ -28,8 +28,11 @@ LibreOffice renders the slides. It uses the fonts installed **on the server**.
 - Animations and slide transitions are not kept, because each slide becomes a still image. Use KevCast's own transitions.
 - Embedded videos are not played. Upload the video as a separate media item.
 
-### I forgot the admin password
-Stop the server. In `data/db.json`, set `"adminUser": null` under `settings`, then start the server again.
+### I forgot my password
+- **Another administrator** can set a new one: *Settings → Users → Edit*.
+- **The only administrator forgot it**: stop the server. In `data/db.json`, under `users`, delete the entry with your
+  `username` (keep a copy of the file first), then start the server. With no administrator left, the Web Studio asks you to
+  create one again. Other users and all content stay.
 The next visit to `/admin/` asks you to create the account again. Content and screens are kept.
 
 ## Screens
@@ -106,7 +109,7 @@ A modest server handles hundreds of screens. Media downloads after a big upload 
 It's not needed, and there are no Docker files on purpose: the native installers avoid Docker Desktop licensing in enterprises.
 
 **Can several people use the admin?**
-There is currently one admin account; share it, or put the admin behind your SSO proxy. Multiple users with roles are on the roadmap.
+Yes. Administrators add users under *Settings → Users*, as an **Editor** (content, playlists, schedules, displays and groups) or an **Administrator** (also users, the organisation name, the roll-out key and backups). Single sign-on isn't built in; you can put the Web Studio behind an SSO proxy.
 
 **Android TV / Samsung Tizen / LG webOS?**
 Use the TV's browser or a kiosk-browser app with the player address. A native Android app is on the roadmap.

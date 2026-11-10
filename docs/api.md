@@ -5,7 +5,8 @@ for example to push a news ticker from another system or upload a new menu every
 
 - Base URL: `http://<server>:8080`
 - Request and response bodies are JSON unless noted. Errors return `{ "error": "message" }` with a 4xx/5xx status.
-- **Admin endpoints** need the session cookie from `POST /api/login`.
+- **Studio endpoints** need the session cookie from `POST /api/login`. Endpoints marked *admin* need a user with the
+  Administrator role (otherwise `403`); all others work for Editors too. Create a separate user for each script or integration.
 - **Player endpoints** need the display token in the `X-Display-Token` header (or `?token=`).
 
 ```bash
@@ -20,21 +21,30 @@ curl -b kc.txt http://server:8080/api/displays
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| GET | `/api/session` | – | `{ setupRequired, user, orgName, version }` |
-| POST | `/api/setup` | `{ username, password, orgName? }` | Creates the admin (first run only; 409 afterwards) |
-| POST | `/api/login` | `{ username, password }` | Sets the session cookie. Rate-limited. |
+| GET | `/api/session` | – | `{ setupRequired, user: { id, username, name, role }, orgName, version }` |
+| POST | `/api/setup` | `{ username, password, orgName? }` | Creates the first administrator (only while there is none; 409 afterwards) |
+| POST | `/api/login` | `{ username, password }` | Sets the session cookie. The username is not case-sensitive. Rate-limited. |
 | POST | `/api/logout` | – | Clears the cookie |
 
-## Overview and settings (admin)
+## Overview and settings
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| GET | `/api/overview` | – | Counts, capabilities (LibreOffice/Poppler paths), `playerUrls`, `serverUrls`, `provisioningKey`, version, platform, data folder |
-| PATCH | `/api/settings` | `{ orgName }` | `{ ok }` |
-| POST | `/api/password` | `{ current, next }` | `{ ok }` |
-| POST | `/api/provisioning-key/rotate` | – | `{ provisioningKey }` |
-| GET | `/api/backup` | – | Database export without credentials (download) |
+| GET | `/api/overview` | – | Counts, capabilities (LibreOffice/Poppler paths), `playerUrls`, `serverUrls`, `provisioningKey` (`null` for editors), version, platform, data folder |
+| PATCH | `/api/settings` | `{ orgName }` | `{ ok }` (*admin*) |
+| POST | `/api/password` | `{ current, next }` | `{ ok }`. Changes your own password and ends your other sessions. |
+| POST | `/api/provisioning-key/rotate` | – | `{ provisioningKey }` (*admin*) |
+| GET | `/api/backup` | – | Database export without users or credentials (download) (*admin*) |
 | GET | `/api/events` | – | Server-Sent Events: `change`, `media`, `heartbeat`, `pairing` |
+
+## Users (admin)
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| GET | `/api/users` | – | `[{ id, username, name, role, createdAt, lastLogin }]` (never passwords) |
+| POST | `/api/users` | `{ username, password, name?, role? }` | The new user. `role` is `editor` (default) or `admin`. Usernames: letters, digits, `. _ @ -`; unique, ignoring case (409). |
+| PATCH | `/api/users/:id` | `{ name?, role?, password? }` | The user. A new role or password ends that user's sessions. |
+| DELETE | `/api/users/:id` | – | `{ ok }`. Not yourself, and not the last administrator (400). |
 
 ## Media (admin)
 

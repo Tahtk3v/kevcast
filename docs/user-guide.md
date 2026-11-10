@@ -310,12 +310,35 @@ Deleting a group never deletes screens. Schedule entries aimed **only** at that 
 ![Settings](images/settings.png)
 
 
-- **General**: organisation name, shown on idle screens and in the apps.
-- **Change password**.
+Everyone sees:
+- **Your account**: your name and role, **Change password** (this signs you out on your other devices) and **Sign out**.
 - **Connect a screen**: the player addresses of this server, with copy buttons.
 - **Server**: whether LibreOffice and the slide renderer were found (with install hints), version, platform and data folder.
+
+Administrators also see:
+- **General**: organisation name, shown on idle screens and in the apps.
+- **Users**: see below.
 - **Roll out the Player app**: the provisioning key and a ready-made `player.json` (see [Enterprise roll-out](rollout.md)). **New key** replaces the key; screens that are already connected keep working.
-- **Account**: download a backup (JSON) and sign out.
+- **Backup**: download the database as JSON (without passwords or media).
+
+### Users
+
+![Users](images/users.png)
+
+Give everyone who manages the screens their own account: **Settings → Users → Add user**. Choose a username
+(used to sign in, no spaces), optionally a full name, a password and a role:
+
+| Role | Can |
+|---|---|
+| **Editor** | Upload and manage media, playlists, schedules, displays and groups. Send content to screens. |
+| **Administrator** | Everything an editor can, plus add, change and remove users, change the organisation name, see and replace the roll-out key, and download backups. |
+
+- Usernames are not case-sensitive.
+- **Edit** a user to rename them, change their role or set a new password (for example when they forgot it). A new
+  password or role signs that user out everywhere.
+- **Remove** a user to stop them signing in. What they made (media, playlists, schedules) stays.
+- There is always at least one administrator: the last one can't be removed or made an editor, and you can't remove yourself.
+- The same accounts work in KevCast Studio, the Web Studio in a browser and the API.
 
 ## Tips for good-looking screens
 
