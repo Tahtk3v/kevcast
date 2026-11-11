@@ -49,7 +49,7 @@ Settings in this file **override** what someone chooses on the screen itself. On
 
 **MSI**: `KevCast-Player-x.y.z-win-x64.msi` installs per machine and supports a silent install:
 ```powershell
-msiexec /i KevCast-Player-0.4.0-win-x64.msi /qn
+msiexec /i KevCast-Player-0.5.0-win-x64.msi /qn
 ```
 
 **player.json** with a small PowerShell script (Intune *Platform script*, SCCM, or a GPO startup script):
@@ -75,7 +75,7 @@ or with **Group Policy Preferences → Windows Settings → Files** (copy from a
 ## Linux / Raspberry Pi: Ansible or a script
 
 ```bash
-sudo apt install ./KevCast-Player-0.4.0-linux-arm64.deb
+sudo apt install ./KevCast-Player-0.5.0-linux-arm64.deb
 sudo mkdir -p /etc/kevcast
 sudo tee /etc/kevcast/player.json >/dev/null <<'JSON'
 { "server": "http://signage.company.local:8080", "provisioningKey": "copy-from-settings", "group": "Warehouse" }
@@ -89,7 +89,7 @@ An Ansible example:
   tasks:
     - name: Install KevCast Player
       ansible.builtin.apt:
-        deb: /srv/packages/KevCast-Player-0.4.0-linux-arm64.deb
+        deb: /srv/packages/KevCast-Player-0.5.0-linux-arm64.deb
     - name: Configure KevCast Player
       ansible.builtin.copy:
         dest: /etc/kevcast/player.json

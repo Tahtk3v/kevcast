@@ -347,3 +347,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .pl-list a .row-del { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: var(--panel); }
 @media (hover: none) { .card-check, .card-del, .row-del { opacity: 1; } }
 .media-grid.selecting .card-check { right: 8px; }
+
+/* Fonts of a presentation (media details) and font replacements (settings) */
+.fonts-box { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.font-list { display: flex; flex-direction: column; gap: 6px; }
+.font-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.font-name { font-weight: 600; }

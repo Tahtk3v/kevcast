@@ -12,6 +12,7 @@ const Database = require('./db');
 const { createAuth } = require('./auth');
 const convert = require('./convert');
 const fonts = require('./fonts');
+const pptx = require('./pptx');
 const { resolve: resolveSchedule } = require('../shared/schedule');
 const pkg = require('../package.json');
 
@@ -200,20 +201,33 @@ function processPresentation(m) {
   const slidesDir = path.join(dir, 'slides');
   db.update('media', m.id, { status: 'processing', error: null });
   toAdmins('media', { id: m.id, status: 'processing' });
+  const original = path.join(dir, m.file);
   convert
     .enqueue(async () => {
       fs.rmSync(slidesDir, { recursive: true, force: true });
-      return convert.convertPresentation(path.join(dir, m.file), slidesDir);
+      // Embedded fonts / "use Arial" are handled on a temporary copy (see server/pptx.js).
+      const have = await fonts.installedFamilies().catch(() => null);
+      let prep = null;
+      try {
+        const replace = Object.fromEntries((db.data.settings.fontReplacements || []).map((r) => [r.from.toLowerCase(), r.to]));
+        prep = pptx.prepare(original, db.get('media', m.id)?.fontMode, (name) => !!have && fonts.isInstalled(have, name), replace);
+      } catch (e) {
+        console.warn(`[convert] ${m.name}: could not prepare the file (${e.message}); converting it as it is`);
+      }
+      try {
+        const slides = await convert.convertPresentation(prep ? prep.file : original, slidesDir);
+        const missingFonts = await fonts.missingFonts(prep ? prep.file : original).catch(() => []);
+        return { slides, missingFonts, embeddedFonts: pptx.embeddedFonts(original), fontsUsed: fonts.fontsUsed(original), replacedFonts: prep ? prep.replaced : [] };
+      } finally {
+        if (prep) fs.rmSync(prep.dir, { recursive: true, force: true });
+      }
     })
-    .then((slides) => {
+    .then(({ slides, missingFonts, embeddedFonts, fontsUsed, replacedFonts }) => {
       // Drop the intermediate PDF LibreOffice leaves next to the slides.
       for (const f of fs.readdirSync(slidesDir)) if (f.endsWith('.pdf')) fs.rmSync(path.join(slidesDir, f));
       if (!db.get('media', m.id)) return;
-      return fonts.missingFonts(path.join(dir, m.file)).catch(() => []).then((missingFonts) => {
-        if (!db.get('media', m.id)) return;
-        db.update('media', m.id, { status: 'ready', slides, error: null, missingFonts });
-        toAdmins('media', { id: m.id, status: 'ready' });
-      });
+      db.update('media', m.id, { status: 'ready', slides, error: null, missingFonts, embeddedFonts, fontsUsed, replacedFonts });
+      toAdmins('media', { id: m.id, status: 'ready' });
     })
     .catch((err) => {
       console.error(`[convert] ${m.name}:`, err.message);
@@ -507,6 +521,7 @@ admin.get('/overview', (req, res) => {
     serverUrls: lanAddresses().map((ip) => `http://${ip}:${PORT}`),
     // Editors can't add screens with the key, so they don't get to see it.
     provisioningKey: req.user.role === 'admin' ? provisioningKey() : null,
+    fontReplacements: db.data.settings.fontReplacements || [],
     platform: `${os.type()} ${os.release()}`,
     dataDir: DATA_DIR,
   });
@@ -569,9 +584,17 @@ admin.patch('/media/:id', (req, res) => {
   if ('url' in patch && !/^https?:\/\//i.test(patch.url || '')) return bad(res, 'Enter a full web address starting with http:// or https://');
   if ('zoom' in patch) patch.zoom = cleanZoom(patch.zoom);
   if ('refreshSeconds' in patch) patch.refreshSeconds = Math.max(0, Number(patch.refreshSeconds) || 0);
+  const before = db.get('media', req.params.id);
+  if (!before) return bad(res, 'Not found', 404);
+  const oldMode = before.fontMode || 'auto'; // db.update changes the record in place
+  // How fonts are handled when converting a PowerPoint (server/pptx.js); changing it converts again.
+  if ('fontMode' in (req.body || {})) {
+    if (!pptx.MODES.includes(req.body.fontMode)) return bad(res, 'Unknown font option');
+    patch.fontMode = req.body.fontMode;
+  }
   const m = db.update('media', req.params.id, patch);
-  if (!m) return bad(res, 'Not found', 404);
-  res.json(publicMedia(m));
+  if (m.type === 'presentation' && 'fontMode' in patch && patch.fontMode !== oldMode && m.status !== 'processing') processPresentation(m);
+  res.json(publicMedia(db.get('media', m.id)));
 });
 
 admin.get('/media/:id/preview', (req, res) => {
@@ -583,8 +606,13 @@ admin.get('/media/:id/preview', (req, res) => {
 // After installing fonts on the server: convert every presentation again.
 admin.post('/media/reconvert-all', (req, res) => {
   const onlyMissing = !!req.body?.onlyMissingFonts;
+  const fontMode = req.body?.fontMode;
+  if (fontMode !== undefined && !pptx.MODES.includes(fontMode)) return bad(res, 'Unknown font option');
   const list = db.list('media').filter((m) => m.type === 'presentation' && m.status !== 'processing' && (!onlyMissing || (m.missingFonts || []).length));
-  for (const m of list) processPresentation(m);
+  for (const m of list) {
+    if (fontMode) m.fontMode = fontMode;
+    processPresentation(m);
+  }
   res.json({ ok: true, count: list.length });
 });
 
@@ -930,6 +958,35 @@ admin.patch('/settings', adminOnly, (req, res) => {
   db.save('settings');
   res.json({ ok: true });
 });
+// Server-wide font replacements for PowerPoint conversion, e.g. [{ from: 'Corporate Sans', to: 'Arial' }].
+// Presentations that use a changed font are converted again.
+admin.put('/font-replacements', adminOnly, (req, res) => {
+  const list = Array.isArray(req.body) ? req.body : req.body?.replacements;
+  if (!Array.isArray(list)) return bad(res, 'Send a list of replacements');
+  const clean = [];
+  for (const r of list) {
+    const from = String(r?.from || '').trim().slice(0, 100);
+    const to = String(r?.to || 'Arial').trim().slice(0, 100) || 'Arial';
+    if (from && !clean.some((x) => x.from.toLowerCase() === from.toLowerCase())) clean.push({ from, to });
+  }
+  const before = new Map((db.data.settings.fontReplacements || []).map((r) => [r.from.toLowerCase(), r.to]));
+  const after = new Map(clean.map((r) => [r.from.toLowerCase(), r.to]));
+  const changed = new Set([...before.keys(), ...after.keys()].filter((k) => before.get(k) !== after.get(k)));
+  db.data.settings.fontReplacements = clean;
+  db.save('settings');
+  let reconverting = 0;
+  if (changed.size) {
+    for (const m of db.list('media')) {
+      if (m.type !== 'presentation' || m.status === 'processing') continue;
+      if ((m.fontsUsed || []).some((f) => changed.has(f.toLowerCase())) || (m.fontsUsed === undefined && /\.(pptx|potx|ppsx|pptm)$/i.test(m.file || ''))) {
+        processPresentation(m);
+        reconverting++;
+      }
+    }
+  }
+  res.json({ replacements: clean, reconverting });
+});
+
 admin.post('/provisioning-key/rotate', adminOnly, (req, res) => {
   db.data.settings.provisioningKey = null;
   res.json({ provisioningKey: provisioningKey() });

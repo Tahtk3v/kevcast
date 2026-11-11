@@ -88,6 +88,11 @@ Click a card to open its details. From there you can:
 **Deleting quickly:** hover over a card and click the red 🗑 in its corner. To delete several items at once, tick the
 box next to it on each card (once one is ticked, clicking a card ticks it), then click **Delete** in the bar that appears.
 
+**Fonts** (PowerPoint files): the details list every font the presentation uses, whether the server has it, and
+whether PowerPoint embedded it in the file. If text comes out garbled or in the wrong place, choose
+**Arial for all text**, or click **Replace with Arial** next to the font that goes wrong (administrators; it then applies
+to every presentation, see **Settings → Server → Font replacements**). Your file itself is never changed.
+
 **⚠ fonts missing on the server** on a PowerPoint card means the slides were made with a replacement font. The Media page
 says which fonts; install them on the server *for all users* and click **Re-convert these**. See
 [Troubleshooting](troubleshooting.md#slides-look-different-from-powerpoint-or-the-text-is-garbled-or-misplaced).

@@ -91,17 +91,20 @@ async function installedFamilies() {
   return set;
 }
 
+/** Whether `have` (from installedFamilies) contains the font, or a metric-compatible replacement. */
+function isInstalled(have, name) {
+  const has = (n) => have.has(n) || [...have].some((f) => f.startsWith(n + ' ')); // "Segoe UI" vs "Segoe UI Semibold"
+  const k = String(name).toLowerCase();
+  return has(k) || !!(COMPATIBLE[k] && has(COMPATIBLE[k]));
+}
+
 /** Fonts used by `file` that this server doesn't have (no metric-compatible replacement either). */
 async function missingFonts(file) {
   const used = fontsUsed(file);
   if (!used.length) return [];
   const have = await installedFamilies();
   if (!have) return [];
-  const has = (n) => have.has(n) || [...have].some((f) => f.startsWith(n + ' ')); // "Segoe UI" vs "Segoe UI Semibold"
-  return used.filter((n) => {
-    const k = n.toLowerCase();
-    return !has(k) && !(COMPATIBLE[k] && has(COMPATIBLE[k]));
-  }).sort((a, b) => a.localeCompare(b));
+  return used.filter((n) => !isInstalled(have, n)).sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -126,4 +129,4 @@ function windowsFontconfig(cacheDir) {
   return file;
 }
 
-module.exports = { fontsUsed, missingFonts, installedFamilies, windowsFontconfig, readZipEntries, _resetCache: () => { cache = { at: 0, families: null }; } };
+module.exports = { fontsUsed, missingFonts, installedFamilies, isInstalled, windowsFontconfig, readZipEntries, _resetCache: () => { cache = { at: 0, families: null }; } };

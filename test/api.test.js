@@ -270,3 +270,20 @@ test('fonts used by a PowerPoint file', () => {
   fs.writeFileSync(file, Buffer.concat([...local, cd, end]));
   assert.deepStrictEqual(fontsUsed(file).sort(), ['Calibri', 'Calibri Light', 'Corporate Sans']);
 });
+
+test('font replacements and font options', async () => {
+  await call('POST', '/api/login', { username: 'sam', password: 'newpass1' }); // administrator
+  let r = await call('PUT', '/api/font-replacements', [{ from: ' Corporate Sans ', to: '' }, { from: 'corporate sans', to: 'Verdana' }, { from: '' }]);
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual(r.body.replacements, [{ from: 'Corporate Sans', to: 'Arial' }], 'trimmed, Arial by default, no duplicates or blanks');
+  assert.deepStrictEqual((await call('GET', '/api/overview')).body.fontReplacements, r.body.replacements);
+  assert.strictEqual((await call('PUT', '/api/font-replacements', { nope: 1 })).status, 400);
+  const text = (await call('POST', '/api/media', { type: 'text', text: { title: 'x' } })).body;
+  assert.strictEqual((await call('PATCH', `/api/media/${text.id}`, { fontMode: 'comic' })).status, 400);
+  assert.strictEqual((await call('PATCH', `/api/media/${text.id}`, { fontMode: 'arial' })).body.fontMode, 'arial');
+  assert.strictEqual((await call('POST', '/api/media/reconvert-all', { fontMode: 'nope' })).status, 400);
+  // Editors can't change the server-wide list.
+  await call('POST', '/api/users', { username: 'ed', password: 'secret123' });
+  await call('POST', '/api/login', { username: 'ed', password: 'secret123' });
+  assert.strictEqual((await call('PUT', '/api/font-replacements', [])).status, 403);
+});

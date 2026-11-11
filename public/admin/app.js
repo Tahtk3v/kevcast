@@ -593,7 +593,48 @@
       h('button', { class: 'btn sm', onclick: async () => {
         const r = await api('/media/reconvert-all', { method: 'POST', body: { onlyMissingFonts: true } });
         toast(tn(r.count, 'Converting {n} presentation again…', 'Converting {n} presentations again…')); await loadAll(); renderPage({ soft: true });
-      } }, icon('refresh'), t('Re-convert these')));
+      } }, icon('refresh'), t('Re-convert these')), ' ',
+      h('button', { class: 'btn sm', title: t('Converts these presentations again with Arial for all text'), onclick: async () => {
+        const r = await api('/media/reconvert-all', { method: 'POST', body: { onlyMissingFonts: true, fontMode: 'arial' } });
+        toast(tn(r.count, 'Converting {n} presentation again…', 'Converting {n} presentations again…')); await loadAll(); renderPage({ soft: true });
+      } }, t('Use Arial for these')));
+  }
+
+  /** Font options of one PowerPoint: Arial for all text, or replace one font everywhere (administrators). */
+  function fontsSection(m, close) {
+    const ooxml = /\.(pptx|potx|ppsx|pptm)$/i.test(m.file || '');
+    if (m.type !== 'presentation' || !ooxml) return null;
+    const used = (m.fontsUsed || []).filter((f) => !/^\+/.test(f));
+    const reps = state.overview?.fontReplacements || [];
+    const repOf = (f) => reps.find((r) => r.from.toLowerCase() === f.toLowerCase());
+    const mode = m.fontMode === 'arial' ? 'arial' : 'auto';
+    const setMode = async (v) => {
+      await api(`/media/${m.id}`, { method: 'PATCH', body: { fontMode: v } });
+      close(); toast(t('Converting again…')); await loadAll(); renderPage({ soft: true });
+    };
+    return h('div', { class: 'fonts-box stack' },
+      h('div', { class: 'row wrap' },
+        h('b', {}, t('Fonts')),
+        h('div', { class: 'spacer' }),
+        segmented([['auto', t('As in the file')], ['arial', t('Arial for all text')]], mode, setMode)),
+      h('div', { class: 'muted small' }, t('Text garbled, chopped up or in the wrong place? Choose “Arial for all text”, or replace just the font that goes wrong.')),
+      used.length && mode === 'auto' ? h('div', { class: 'font-list' }, used.map((f) => {
+        const r = repOf(f);
+        const missing = (m.missingFonts || []).includes(f);
+        return h('div', { class: 'font-row' },
+          h('span', { class: 'font-name' }, f),
+          r ? h('span', { class: 'badge' }, t('→ {font} on every slide', { font: r.to })) : missing ? h('span', { class: 'badge warn' }, t('Missing on the server')) : h('span', { class: 'badge ok' }, t('Installed')),
+          (m.embeddedFonts || []).some((e) => e.toLowerCase() === f.toLowerCase()) ? h('span', { class: 'badge', title: t('PowerPoint saved a copy of this font in the file') }, t('Embedded')) : null,
+          h('div', { class: 'spacer' }),
+          isAdmin() ? h('button', { class: 'btn sm', title: r ? t('Use the font itself again') : t('Applies to every presentation that uses this font') , onclick: async () => {
+            const list = r ? reps.filter((x) => x !== r) : [...reps, { from: f, to: 'Arial' }];
+            const res = await api('/font-replacements', { method: 'PUT', body: list });
+            close();
+            toast(r ? t('“{font}” is used again', { font: f }) : t('“{font}” is replaced by Arial in every presentation', { font: f }), 'ok');
+            if (res.reconverting) toast(tn(res.reconverting, 'Converting {n} presentation again…', 'Converting {n} presentations again…'));
+            await loadAll(); renderPage({ soft: true });
+          } }, r ? t('Use the font again') : t('Replace with Arial')) : null);
+      })) : null);
   }
 
   function MediaPage() {
@@ -665,13 +706,15 @@
     else if (m.type === 'text') preview = textPreview(m.text);
     const big = h('div', { class: 'preview-big' }, preview || (m.status === 'processing' ? h('div', { class: 'spinner' }) : icon('media')));
     const usedIn = state.playlists.filter((p) => p.items.some((i) => i.mediaId === m.id));
-    modal({
+    let closeDialog = () => {};
+    closeDialog = modal({
       title: TYPE_LABEL[m.type] || t('Media'),
       wide: true,
       body: [
         big,
         m.status === 'error' ? h('div', { class: 'alert' }, h('b', {}, t('Conversion failed: ')), t(m.error || '')) : null,
         m.missingFonts?.length && m.status === 'ready' ? h('div', { class: 'alert' }, h('b', {}, t('Missing on the server: {v}. ', { v: m.missingFonts.join(', ') })), t('These slides use a replacement font, so text can look different or be misplaced. '), FONT_HELP) : null,
+        m.status === 'ready' ? fontsSection(m, () => closeDialog()) : null,
         m.slideUrls && m.slideUrls.length > 1 ? h('div', { class: 'slides-strip' }, m.slideUrls.map((u) => h('img', { src: u, loading: 'lazy', onclick: () => big.replaceChildren(h('img', { src: u })) }))) : null,
         h('label', { class: 'field' }, t('Name'), name),
         h('div', { class: 'muted small' },
@@ -2028,6 +2071,31 @@
         } }, icon('trash')))));
   }
 
+  /** Settings → Server: fonts LibreOffice should not use, with what to use instead. */
+  function fontReplacementsRow(o) {
+    const reps = o.fontReplacements || [];
+    const known = [...new Set(state.media.flatMap((m) => m.fontsUsed || []))].filter((f) => !/^\+/.test(f)).sort();
+    const from = h('input', { placeholder: t('Font name, e.g. Corporate Sans'), list: 'kc-fonts' });
+    const to = h('input', { value: 'Arial', style: { width: '130px' } });
+    const save = async (list) => {
+      try {
+        const r = await api('/font-replacements', { method: 'PUT', body: list });
+        o.fontReplacements = r.replacements;
+        if (r.reconverting) toast(tn(r.reconverting, 'Converting {n} presentation again…', 'Converting {n} presentations again…'), 'ok');
+        renderPage({ soft: true });
+      } catch (e) { toast(e.message, 'err'); }
+    };
+    return h('div', { class: 'list-row', style: { display: 'block' } },
+      h('b', {}, t('Font replacements')),
+      h('div', { class: 'muted small' }, t('For fonts that come out garbled or wrong: every PowerPoint uses the replacement instead.')),
+      reps.length ? h('div', { class: 'font-list', style: { marginTop: '8px' } }, reps.map((r) => h('div', { class: 'font-row' },
+        h('span', { class: 'font-name' }, r.from), '→', h('span', {}, r.to), h('div', { class: 'spacer' }),
+        h('button', { class: 'btn sm ghost', title: t('Remove'), onclick: () => save(reps.filter((x) => x !== r)) }, icon('trash'))))) : null,
+      h('datalist', { id: 'kc-fonts' }, known.map((f) => h('option', { value: f }))),
+      h('div', { class: 'row', style: { marginTop: '8px' } }, from, '→', to,
+        h('button', { class: 'btn sm', onclick: () => { if (from.value.trim()) save([...reps, { from: from.value.trim(), to: to.value.trim() || 'Arial' }]); } }, icon('plus'), t('Add'))));
+  }
+
   function SettingsPage() {
     const o = state.overview;
     const me = state.session.user;
@@ -2070,7 +2138,8 @@
               h('button', { class: 'btn sm', onclick: async () => {
                 const r = await api('/media/reconvert-all', { method: 'POST', body: {} });
                 toast(tn(r.count, 'Converting {n} presentation again…', 'Converting {n} presentations again…'), 'ok');
-              } }, icon('refresh'), t('Re-convert all')))),
+              } }, icon('refresh'), t('Re-convert all'))),
+            isAdmin() ? fontReplacementsRow(o) : null),
           isAdmin() ? rolloutCard(o) : null,
           isAdmin() ? h('div', { class: 'card pad stack' }, h('h2', {}, t('Backup')),
             h('p', { class: 'muted', style: { margin: 0 } }, t('The database without passwords or media files. For a full backup, copy the data folder.')),

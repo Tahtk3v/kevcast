@@ -5,6 +5,18 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-11
+### Fixed
+- **Garbled PowerPoint text with the font installed.** The garbling came from LibreOffice itself drawing those fonts
+  wrongly, not from KevCast's slide renderer. KevCast now works around it without changing your file:
+  - Fonts that PowerPoint embedded in the file are ignored when the server has the font installed. LibreOffice often draws
+    embedded (subset) fonts wrongly.
+  - **Fonts → Arial for all text** on a presentation converts it with Arial.
+  - **Replace with Arial** next to one font, and **Settings → Server → Font replacements**, replace a font in every
+    presentation, with Arial or another font.
+  - **Use Arial for these** on the Media page does it for all presentations with missing fonts.
+- The presentation details list every font used, whether it is installed, embedded or replaced.
+
 ## [0.4.0] - 2026-11-10
 ### Added
 - **Dutch and German.** The Web Studio, KevCast Studio, the player screens, the start page and the desktop apps' menus and
