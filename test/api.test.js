@@ -312,3 +312,30 @@ test('Studio options per user, and PDFs converted by PowerPoint', async () => {
   const img = await upload('photo.png', 'png', { convertedWith: 'PowerPoint' });
   assert.strictEqual(img.convertedWith, undefined, 'only PDFs can be marked');
 });
+
+test('weather and traffic slides', async () => {
+  await call('POST', '/api/login', { username: 'sam', password: 'newpass1' });
+  assert.strictEqual((await call('POST', '/api/media', { type: 'weather' })).status, 400, 'a location is needed');
+  assert.strictEqual((await call('POST', '/api/media', { type: 'weather', place: { name: 'X', lat: 200, lon: 5 } })).status, 400);
+  const place = { name: 'Houten', lat: 52.008123, lon: 5.17771, country: 'NL', region: 'Utrecht' };
+  const w = (await call('POST', '/api/media', { type: 'weather', place, weather: { hourly: false } })).body;
+  assert.deepStrictEqual(w.place, { name: 'Houten', lat: 52.0081, lon: 5.1777, country: 'nl', region: 'Utrecht' });
+  assert.deepStrictEqual(w.weather, { hourly: false, days: true, warnings: true });
+  const tr = (await call('POST', '/api/media', { type: 'traffic', name: 'Verkeer', place, destinations: [{ name: 'Amsterdam', lat: 52.37, lon: 4.89 }, { name: 'bad' }] })).body;
+  assert.deepStrictEqual(tr.destinations.map((d) => d.name), ['Amsterdam'], 'invalid destinations dropped');
+  assert.deepStrictEqual((await call('PATCH', `/api/media/${tr.id}`, { destinations: [] })).body.destinations, [], 'empty = the nearest big cities');
+  // The player shows them as KevCast's own pages.
+  const pl = (await call('POST', '/api/playlists', { name: 'Live' })).body;
+  await call('PUT', `/api/playlists/${pl.id}`, { items: [{ mediaId: w.id }] });
+  const preview = (await call('GET', `/api/playlists/${pl.id}/preview`)).body;
+  assert.deepStrictEqual([preview.items[0].type, preview.items[0].widget, preview.items[0].url], ['web', 'weather', `/widgets/weather.html?id=${w.id}`]);
+  // Slide data is public, but only for these two types; the pages themselves are served.
+  const text = (await call('POST', '/api/media', { type: 'text', text: { title: 'x' } })).body;
+  assert.strictEqual((await fetch(`${base}/api/widgets/${text.id}`)).status, 404);
+  assert.strictEqual((await fetch(`${base}/widgets/weather.html`)).status, 200);
+  assert.deepStrictEqual((await call('GET', '/api/geocode?q=a')).body, [], 'too short to search');
+  assert.ok((await call('GET', '/api/places/cities?country=nl')).body.some((c) => c.name === 'Amsterdam'));
+  // Clock format per screen.
+  const d = (await call('GET', '/api/displays')).body[0];
+  assert.strictEqual((await call('PATCH', `/api/displays/${d.id}`, { clockFormat: '12' })).body.clockFormat, '12');
+});

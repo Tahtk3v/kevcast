@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KevCast traffic</title>
+  <link rel="stylesheet" href="widget.css">
+  <script>window.KEVCAST_LANG = new URLSearchParams(location.search).get('lang') || undefined;</script>
+  <script src="/shared/i18n.js"></script>
+</head>
+<body>
+  <div class="page" id="page"></div>
+  <div id="status" hidden></div>
+  <script src="widget.js"></script>
+  <script>
+  (function () {
+    const { el, t, tn, fmtTime } = KevWidget;
+    const dur = (min) => (min >= 60 ? t('{h} h {m} min', { h: Math.floor(min / 60), m: String(min % 60).padStart(2, '0') }) : t('{m} min', { m: min }));
+    const road = (r) => el('span', `road ${/^N/i.test(r) ? 'n' : ''}`, r);
+    function render(d) {
+      const page = document.getElementById('page');
+      const routes = (d.routes || []).filter((r) => !r.error);
+      page.replaceChildren(
+        el('div', 'head', el('div', '', el('h1', '', d.name && d.name !== d.origin.name ? d.name : t('Travel times from {place}', { place: d.origin.name })),
+          el('div', 'sub', d.live ? t('Including current traffic jams') : d.liveAvailable ? t('Current traffic jams are unavailable right now') : t('Normal travel times (current traffic only in the Netherlands)')))),
+        el('div', 'routes', routes.map((r) => {
+          const cls = r.delayMin >= 10 ? 'jam' : r.delayMin >= 3 ? 'slow' : '';
+          const jams = (r.jams || []).filter((j) => j.delayMin > 0 || j.kind === 'accident');
+          return el('div', `route ${cls}`,
+            el('div', '', el('div', 'to', r.name), el('div', 'via', (r.via || []).map(road), el('span', 'sub', ` ${r.distanceKm} km`))),
+            el('div', 'time', dur(r.totalMin), r.delayMin > 0 ? el('small', 'delay', t('+{m} min delay', { m: r.delayMin })) : el('small', '', t('No delays'))),
+            jams.length ? el('div', 'jams', jams.slice(0, 3).map((j) => [
+              j.kind === 'accident' ? t('Accident') : tn(1, 'Traffic jam', 'Traffic jams'),
+              j.road ? ` ${j.road}` : '',
+              j.lengthKm ? ` · ${j.lengthKm} km` : '',
+              j.delayMin ? ` · +${j.delayMin} min` : '',
+            ].join('')).join('   ·   ')) : null);
+        })),
+        el('div', 'foot',
+          el('span', '', t('Routes: {sources}', { sources: (d.sources || []).join(' · ') })),
+          el('span', 'spacer'),
+          d.stale ? el('span', 'stale', t('Last update {time}', { time: fmtTime(d.updated) })) : el('span', '', t('Updated {time}', { time: fmtTime(d.updated) }))));
+    }
+    KevWidget.run(render, 2 * 60 * 1000);
+  })();
+  </script>
+</body>
+</html>

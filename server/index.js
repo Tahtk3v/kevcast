@@ -13,6 +13,9 @@ const { createAuth } = require('./auth');
 const convert = require('./convert');
 const fonts = require('./fonts');
 const pptx = require('./pptx');
+const geo = require('./live/geo');
+const liveWeather = require('./live/weather');
+const liveTraffic = require('./live/traffic');
 const { resolve: resolveSchedule } = require('../shared/schedule');
 const pkg = require('../package.json');
 
@@ -249,6 +252,8 @@ function expandMedia(m, it, defaults) {
   else if (m.type === 'video') out.push({ ...base, type: 'video', url: mediaUrl(m, m.file), duration, mute: it.mute !== false });
   else if (m.type === 'web') out.push({ ...base, type: 'web', url: m.url, duration, zoom: Number(m.zoom) || 100, refreshSeconds: Number(m.refreshSeconds) || 0 });
   else if (m.type === 'text') out.push({ ...base, type: 'text', text: m.text, duration });
+  // Weather and traffic slides are pages served by KevCast itself (public/widgets), shown like a web page.
+  else if (m.type === 'weather' || m.type === 'traffic') out.push({ ...base, type: 'web', widget: m.type, url: `/widgets/${m.type}.html?id=${m.id}`, duration, zoom: 100, refreshSeconds: 0 });
   return out;
 }
 
@@ -584,13 +589,42 @@ admin.post('/media', (req, res) => {
     if (!text || !(text.title || text.body)) return bad(res, 'Add a title or some text');
     return res.json(publicMedia(db.insert('media', { type, name: name || text.title || 'Text slide', text, status: 'ready', tags: [] })));
   }
+  if (type === 'weather' || type === 'traffic') {
+    const place = cleanPlace(req.body.place);
+    if (!place) return bad(res, 'Choose a location');
+    const rec = { type, name: name || place.name, place, status: 'ready', tags: [] };
+    if (type === 'weather') rec.weather = cleanWeatherOptions(req.body.weather);
+    if (type === 'traffic') rec.destinations = cleanDestinations(req.body.destinations);
+    return res.json(publicMedia(db.insert('media', rec)));
+  }
   bad(res, 'Unknown media type');
 });
 
 const cleanZoom = (z) => Math.max(25, Math.min(400, Math.round(Number(z) || 100)));
+// Live data slides ------------------------------------------------------------------
+function cleanPlace(p) {
+  const lat = Number(p?.lat);
+  const lon = Number(p?.lon);
+  if (!p || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return {
+    name: String(p.name || '').trim().slice(0, 80) || `${lat.toFixed(2)}, ${lon.toFixed(2)}`,
+    lat: Number(lat.toFixed(4)),
+    lon: Number(lon.toFixed(4)),
+    country: String(p.country || '').toLowerCase().slice(0, 2),
+    region: String(p.region || '').slice(0, 80),
+  };
+}
+const cleanDestinations = (list) => (Array.isArray(list) ? list.map(cleanPlace).filter(Boolean).slice(0, 8) : []);
+const cleanWeatherOptions = (o = {}) => ({ hourly: o.hourly !== false, days: o.days !== false, warnings: o.warnings !== false });
 admin.patch('/media/:id', (req, res) => {
   const allowed = ['name', 'url', 'text', 'tags', 'zoom', 'refreshSeconds'];
   const patch = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
+  if ('place' in (req.body || {})) {
+    patch.place = cleanPlace(req.body.place);
+    if (!patch.place) return bad(res, 'Choose a location');
+  }
+  if ('destinations' in (req.body || {})) patch.destinations = cleanDestinations(req.body.destinations);
+  if ('weather' in (req.body || {})) patch.weather = cleanWeatherOptions(req.body.weather);
   if ('url' in patch && !/^https?:\/\//i.test(patch.url || '')) return bad(res, 'Enter a full web address starting with http:// or https://');
   if ('zoom' in patch) patch.zoom = cleanZoom(patch.zoom);
   if ('refreshSeconds' in patch) patch.refreshSeconds = Math.max(0, Number(patch.refreshSeconds) || 0);
@@ -606,6 +640,19 @@ admin.patch('/media/:id', (req, res) => {
   if (m.type === 'presentation' && 'fontMode' in patch && patch.fontMode !== oldMode && m.status !== 'processing') processPresentation(m);
   res.json(publicMedia(db.get('media', m.id)));
 });
+
+// Find a place by name for weather and traffic slides (OpenStreetMap).
+admin.get('/geocode', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 2) return res.json([]);
+  try {
+    const seen = new Set();
+    res.json((await geo.search(q, String(req.query.lang || 'en').slice(0, 5))).filter((p) => !seen.has(p.label) && seen.add(p.label)));
+  } catch (e) {
+    bad(res, 'Could not search for places: the server can’t reach OpenStreetMap', 502);
+  }
+});
+admin.get('/places/cities', (req, res) => res.json(liveTraffic.citiesFor(String(req.query.country || '').toLowerCase())));
 
 admin.get('/media/:id/preview', (req, res) => {
   const p = expandSingle(req.params.id);
@@ -807,7 +854,7 @@ admin.post('/displays/command', (req, res) => {
   res.json({ ok: true, targeted: list.length, delivered });
 });
 admin.patch('/displays/bulk', (req, res) => {
-  const allowed = ['groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'ticker', 'background', 'maintenance'];
+  const allowed = ['groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'clockFormat', 'ticker', 'background', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body?.patch || {}).filter(([k]) => allowed.includes(k)));
   if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
   if (patch.groups) patch.groups = ensureGroups(patch.groups);
@@ -829,7 +876,7 @@ admin.get('/displays/:id/screenshot', (req, res) => {
 });
 
 admin.patch('/displays/:id', (req, res) => {
-  const allowed = ['name', 'groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'ticker', 'background', 'notes', 'maintenance'];
+  const allowed = ['name', 'groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'clockFormat', 'ticker', 'background', 'notes', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
   if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
   if (patch.groups) patch.groups = ensureGroups(Array.isArray(patch.groups) ? patch.groups : []);
@@ -1061,6 +1108,23 @@ admin.delete('/users/:id', adminOnly, (req, res) => {
   db.remove('users', u.id);
   res.json({ ok: true });
 });
+
+// Data for the weather and traffic slides (public/widgets). Players and previews load it without a login;
+// it only exists for those two media types and contains nothing private.
+app.get('/api/widgets/:id', async (req, res) => {
+  const m = db.get('media', req.params.id);
+  if (!m || !['weather', 'traffic'].includes(m.type) || !m.place) return bad(res, 'Not found', 404);
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const lang = String(req.query.lang || 'en').slice(0, 2);
+    if (m.type === 'weather') return res.json({ name: m.name, options: cleanWeatherOptions(m.weather), ...(await liveWeather.weather(m.place, lang)) });
+    return res.json({ name: m.name, ...(await liveTraffic.traffic(m.place, m.destinations)) });
+  } catch (e) {
+    console.warn(`[live] ${m.type} ${m.name}: ${e.message}`);
+    bad(res, `No ${m.type} data right now (${e.message})`, 502);
+  }
+});
+app.use('/widgets', express.static(path.join(pub, 'widgets'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
 app.use('/api', admin);
 

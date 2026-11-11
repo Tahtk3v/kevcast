@@ -5,6 +5,18 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-11
+### Added
+- **Weather slides.** The weather now, today hour by hour and the next 5 days for a place you search, with the official
+  weather warnings: KNMI's codes and notices in the Netherlands, other national weather services elsewhere in Europe.
+  Forecast from MET Norway, warnings from MeteoAlarm; no account or API key.
+- **Traffic slides.** Travel times by car to the nearest big cities or destinations you choose. In the Netherlands they
+  include current traffic jams and accidents on the route (NDW open data); elsewhere normal travel times
+  (OpenStreetMap/OSRM). No account or API key.
+- Both follow the screen's language and clock setting, update themselves, and keep their last data when offline.
+- **Clock setting per screen**: automatic, 24-hour or 12-hour, for the idle screen and the clock in the corner.
+- Docs: which internet addresses the server needs for these slides, and proxy settings.
+
 ## [0.6.0] - 2026-11-11
 ### Added
 - **KevCast Studio converts PowerPoints with your own PowerPoint (Windows).** An administrator turns it on per user

@@ -31,6 +31,10 @@ function dictionary(code) {
 const used = new Set([
   ...keysInCode(read('public/admin/app.js')), ...keysInCode(read('public/player/player.js')), ...keysInCode(read('public/index.html')),
   ...keysInHtml(read('public/player/index.html')), ...keysInHtml(read('public/index.html')),
+  // Weather and traffic slides (texts chosen at runtime are listed explicitly).
+  ...keysInCode(read('public/widgets/widget.js')), ...keysInCode(read('public/widgets/weather.html')), ...keysInCode(read('public/widgets/traffic.html')),
+  'Code yellow', 'Code orange', 'Code red',
+  ...Object.values(vm.runInNewContext(`(${read('public/widgets/widget.js').match(/const SYMBOL_TEXT = (\{[\s\S]*?\});/)[1]})`)),
 ]);
 
 for (const code of ['nl', 'de']) {
