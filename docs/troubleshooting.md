@@ -38,6 +38,9 @@ another one, which makes text wider or narrower, so it wraps differently and box
   - Or click **Replace with Arial** next to the one font that goes wrong. That applies to every presentation using it.
     Manage the list under **Settings → Server → Font replacements**; you can pick another font than Arial there.
   - On the Media page, **Use Arial for these** does it for all presentations with missing fonts at once.
+  - **Exactly like the original:** export the presentation to PDF in PowerPoint and upload the PDF, or let KevCast Studio
+    do that automatically: an administrator turns on *Convert PowerPoint files with PowerPoint on this user's computer*
+    for the user ([KevCast Studio](studio.md#powerpoint-converted-on-your-own-computer-windows)).
   - With KevCast 0.3.0 or earlier on Windows, the bundled slide renderer also couldn't find fonts that weren't embedded
     in the PDF. Update the server (0.4.0 and later) and re-convert.
 - For a pixel-perfect result, export the presentation to **PDF** in PowerPoint (*File → Export → PDF*) and upload the PDF:

@@ -82,6 +82,17 @@ jobs:
         shell: pwsh
         run: ./packaging/windows/build.ps1
 
+      - name: Check KevCast Studio's PowerPoint script parses (no PowerPoint on CI to run it)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          node -e "require('fs').writeFileSync('kevcast-to-pdf.ps1', require('./desktop/studio/powerpoint.js').SCRIPT)"
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD\kevcast-to-pdf.ps1", [ref]$null, [ref]$errors) | Out-Null
+          if ($errors) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }
+          Remove-Item kevcast-to-pdf.ps1
+          Write-Host 'PowerPoint conversion script parses.'
+
       - name: Install KevCast Server Setup silently, check the server answers, uninstall it
         if: runner.os == 'Windows'
         shell: pwsh

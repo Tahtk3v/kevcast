@@ -7,6 +7,8 @@ const crypto = require('crypto');
 const { Readable } = require('stream');
 const { app, dialog, ipcMain, session, shell } = require('electron');
 const { t: tr } = require('../common/i18n');
+const powerpoint = require('./powerpoint');
+const pptx = require('../common/pptx');
 
 const EXTENSIONS = {
   presentation: ['.pptx', '.ppt', '.pps', '.ppsx', '.pot', '.potx', '.odp', '.key', '.pdf'],
@@ -92,10 +94,13 @@ function listDir(dir) {
 }
 
 /** Stream one file to POST /api/media/upload as multipart/form-data. */
-async function uploadFile(serverUrl, cookie, file, onProgress) {
+async function uploadFile(serverUrl, cookie, file, onProgress, fields = {}) {
   const boundary = `----KevCastStudio${crypto.randomBytes(12).toString('hex')}`;
-  const name = path.basename(file.path).replace(/"/g, '%22').replace(/[\r\n]/g, ' ');
-  const head = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="${name}"\r\nContent-Type: application/octet-stream\r\n\r\n`);
+  const clean = (v) => String(v).replace(/"/g, '%22').replace(/[\r\n]/g, ' ');
+  const name = clean(path.basename(file.path));
+  // Text fields go before the file, so the server has them when the file arrives.
+  const fieldParts = Object.entries(fields).map(([k, v]) => `--${boundary}\r\nContent-Disposition: form-data; name="${clean(k)}"\r\n\r\n${String(v).replace(/[\r\n]/g, ' ')}\r\n`).join('');
+  const head = Buffer.from(`${fieldParts}--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="${name}"\r\nContent-Type: application/octet-stream\r\n\r\n`);
   const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
   let sent = 0;
   async function* body() {
@@ -173,24 +178,51 @@ function registerLocalFiles({ getServer, getWindow, config }) {
   ipcMain.handle('studio:remember-folder', guard((e, dir) => { remember(dir); return true; }));
   ipcMain.handle('studio:reveal', guard((e, p) => { shell.showItemInFolder(p); return true; }));
 
-  ipcMain.handle('studio:upload', guard(async (e, paths) => {
+  ipcMain.handle('studio:capabilities', guard(async () => ({ powerpoint: await powerpoint.isAvailable() })));
+
+  // opts (from the Web Studio, per the signed-in user's options): { powerpoint, replaceFonts, fontReplacements }
+  ipcMain.handle('studio:upload', guard(async (e, paths, opts = {}) => {
     const server = getServer().replace(/\/+$/, '');
     const cookies = await session.defaultSession.cookies.get({ url: server });
     const cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
     const files = (paths || []).map(fileInfo).filter(Boolean);
+    const usePowerPoint = !!opts.powerpoint && (await powerpoint.isAvailable());
+    const replace = opts.replaceFonts === false ? {} : Object.fromEntries((opts.fontReplacements || [])
+      .filter((r) => r && r.from).map((r) => [String(r.from).toLowerCase(), String(r.to || 'Arial')]));
     const results = [];
     for (const f of files) {
       let last = 0;
       const report = (status, loaded, extra = {}) => e.sender.send('studio:upload-progress', { path: f.path, name: f.name, size: f.size, loaded, status, ...extra });
+      let send = f;
+      let fields = {};
+      const temp = [];
+      if (usePowerPoint && powerpoint.isPowerPoint(f.path)) {
+        // Convert with the user's PowerPoint; on any problem upload the original (the server converts it).
+        report('converting', 0);
+        try {
+          const dir = powerpoint.tempDir();
+          temp.push(dir);
+          let source = f.path;
+          const prep = Object.keys(replace).length ? pptx.prepare(f.path, 'auto', () => false, replace) : null;
+          if (prep) { temp.push(prep.dir); source = prep.file; }
+          const pdf = await powerpoint.toPdf(source, dir);
+          send = { ...f, path: pdf, size: fs.statSync(pdf).size };
+          fields = { convertedWith: 'PowerPoint', sourceName: f.name };
+        } catch (err) {
+          report('converting', 0, { warning: tr('PowerPoint could not convert this file ({error}); the server converts it instead.', { error: err.message }) });
+        }
+      }
       report('uploading', 0);
       try {
-        const created = await uploadFile(server, cookie, f, (loaded) => {
-          if (Date.now() - last > 200) { last = Date.now(); report('uploading', loaded); }
-        });
-        report('done', f.size);
+        const created = await uploadFile(server, cookie, send, (loaded) => {
+          if (Date.now() - last > 200) { last = Date.now(); report('uploading', Math.round((loaded / send.size) * f.size)); }
+        }, fields);
+        report('done', f.size, { convertedWith: fields.convertedWith || null });
         results.push(...created);
       } catch (err) {
         report('error', 0, { error: err.message });
+      } finally {
+        for (const d of temp) fs.rmSync(d, { recursive: true, force: true });
       }
     }
     if (files[0]) remember(path.dirname(files[0].path));

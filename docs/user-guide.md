@@ -364,6 +364,9 @@ Give everyone who manages the screens their own account: **Settings â†’ Users â†
 - **Remove** a user to stop them signing in. What they made (media, playlists, schedules) stays.
 - There is always at least one administrator: the last one can't be removed or made an editor, and you can't remove yourself.
 - The same accounts work in KevCast Studio, the Web Studio in a browser and the API.
+- **KevCast Studio on Windows** (per user): *Convert PowerPoint files with PowerPoint on this user's computer* makes
+  Studio save PowerPoints as PDF with the user's own PowerPoint before uploading, so they look exactly like the original.
+  See [KevCast Studio](studio.md#powerpoint-converted-on-your-own-computer-windows).
 
 ### Language
 

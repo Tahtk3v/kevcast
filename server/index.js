@@ -324,7 +324,13 @@ app.use('/media', express.static(MEDIA_DIR, { maxAge: '7d', immutable: true }));
 // Session / setup
 // ---------------------------------------------------------------------------
 const ROLES = ['admin', 'editor'];
-const publicUser = (u) => u && { id: u.id, username: u.username, name: u.name || u.username, role: u.role, createdAt: u.createdAt, lastLogin: u.lastLogin || null };
+// Per-user KevCast Studio options (set by an administrator):
+//   powerpoint     – Studio on Windows converts PowerPoint files with the user's own PowerPoint to PDF before uploading
+//   replaceFonts   – and applies the server's font replacements to the file first
+const STUDIO_OPTIONS = ['powerpoint', 'replaceFonts'];
+const studioOptions = (u) => ({ powerpoint: !!u.studio?.powerpoint, replaceFonts: u.studio?.replaceFonts !== false });
+const cleanStudio = (v, old = {}) => Object.fromEntries(STUDIO_OPTIONS.map((k) => [k, v && k in v ? !!v[k] : studioOptions({ studio: old })[k]]));
+const publicUser = (u) => u && { id: u.id, username: u.username, name: u.name || u.username, role: u.role, createdAt: u.createdAt, lastLogin: u.lastLogin || null, studio: studioOptions(u) };
 const findUser = (username) => {
   const n = String(username || '').trim().toLowerCase();
   return n ? db.list('users').find((u) => u.username.toLowerCase() === n) : null;
@@ -554,6 +560,10 @@ admin.post('/media/upload', upload.array('files', 50), (req, res) => {
       mimetype: f.mimetype,
       status: type === 'presentation' ? 'processing' : 'ready',
       tags: [],
+      // KevCast Studio converted a PowerPoint to this PDF with the user's own PowerPoint.
+      ...(ext === '.pdf' && req.body?.convertedWith === 'PowerPoint'
+        ? { convertedWith: 'PowerPoint', sourceName: String(req.body.sourceName || '').slice(0, 255) || null }
+        : {}),
     });
     const dir = path.join(MEDIA_DIR, m.id);
     fs.mkdirSync(dir, { recursive: true });
@@ -1018,7 +1028,7 @@ admin.post('/users', adminOnly, (req, res) => {
   if (!ROLES.includes(role)) return bad(res, 'Unknown role');
   if (!password || password.length < 6) return bad(res, 'The password must be at least 6 characters');
   const name = String(req.body?.name || '').trim().slice(0, 100) || username;
-  const user = db.insert('users', { username, name, role, sv: 0, ...auth.hashPassword(password) });
+  const user = db.insert('users', { username, name, role, sv: 0, studio: cleanStudio(req.body?.studio), ...auth.hashPassword(password) });
   res.json(publicUser(user));
 });
 admin.patch('/users/:id', adminOnly, (req, res) => {
@@ -1037,6 +1047,7 @@ admin.patch('/users/:id', adminOnly, (req, res) => {
     u.sv = (u.sv || 0) + 1;
   }
   if (name !== undefined) u.name = String(name).trim().slice(0, 100) || u.username;
+  if (req.body?.studio !== undefined) u.studio = cleanStudio(req.body.studio, u.studio);
   u.updatedAt = new Date().toISOString();
   db.save('users');
   if (u.id === req.user.id) auth.issue(res, u); // keep yourself signed in

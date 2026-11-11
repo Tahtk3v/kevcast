@@ -42,9 +42,9 @@ curl -b kc.txt http://server:8080/api/displays
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| GET | `/api/users` | – | `[{ id, username, name, role, createdAt, lastLogin }]` (never passwords) |
-| POST | `/api/users` | `{ username, password, name?, role? }` | The new user. `role` is `editor` (default) or `admin`. Usernames: letters, digits, `. _ @ -`; unique, ignoring case (409). |
-| PATCH | `/api/users/:id` | `{ name?, role?, password? }` | The user. A new role or password ends that user's sessions. |
+| GET | `/api/users` | – | `[{ id, username, name, role, createdAt, lastLogin, studio: { powerpoint, replaceFonts } }]` (never passwords). `studio`: KevCast Studio on Windows converts PowerPoints with the user's own PowerPoint before uploading. |
+| POST | `/api/users` | `{ username, password, name?, role?, studio? }` | The new user. `role` is `editor` (default) or `admin`. Usernames: letters, digits, `. _ @ -`; unique, ignoring case (409). |
+| PATCH | `/api/users/:id` | `{ name?, role?, password?, studio? }` | The user. A new role or password ends that user's sessions. |
 | DELETE | `/api/users/:id` | – | `{ ok }`. Not yourself, and not the last administrator (400). |
 
 ## Media (admin)

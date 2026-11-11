@@ -72,6 +72,23 @@ Other ways to upload in Studio:
 Files are streamed straight from disk to the server, so large videos upload fine. Uploading only reads the files you choose;
 Studio never changes or deletes anything on your computer.
 
+## PowerPoint converted on your own computer (Windows)
+
+An administrator can turn this on per user: **Settings → Users → Edit → Convert PowerPoint files with PowerPoint on
+this user's computer**. When that user uploads a PowerPoint from KevCast Studio on a Windows PC with Microsoft PowerPoint:
+
+1. Studio opens the file in PowerPoint in the background and saves it as a PDF. The fonts are embedded in the PDF.
+2. Studio uploads that PDF. The server shows it as is: slides look exactly like they do in PowerPoint, and the server
+   needs neither the fonts nor LibreOffice.
+
+- With **Apply the font replacements first** (on by default), the server's font replacements (Settings → Server) are
+  applied to a copy of the file before PowerPoint converts it.
+- It works for uploads with **Browse…**, the *This computer* panel and drag and drop. The media details then say
+  *Converted to PDF by PowerPoint on the uploader's computer*.
+- If PowerPoint is open with your own presentations, they're left alone; otherwise PowerPoint is closed again afterwards.
+- No PowerPoint on that computer (or on a Mac, or in a web browser), or PowerPoint fails or takes over 3 minutes: the
+  original file is uploaded and the server converts it as usual. *This computer* shows which applies.
+
 ## Working in Studio
 
 - **Drag PowerPoint files** from Explorer or Finder straight onto the window to upload them.

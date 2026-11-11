@@ -353,3 +353,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .font-list { display: flex; flex-direction: column; gap: 6px; }
 .font-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .font-name { font-weight: 600; }
+
+.ppt-note { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.ppt-note.on { color: var(--accent); background: var(--accent-2); }
+.ppt-note svg { width: 16px; height: 16px; flex: none; }

@@ -76,6 +76,7 @@ const NL = {
   'No permission to open this folder': 'Geen toestemming om deze map te openen',
   'Choose files to upload to KevCast': 'Kies bestanden om naar KevCast te uploaden',
   'Open a folder': 'Een map openen',
+  'PowerPoint could not convert this file ({error}); the server converts it instead.': 'PowerPoint kon dit bestand niet omzetten ({error}); de server zet het om.',
 };
 const DE = {
   'Preview — KevCast': 'Vorschau — KevCast',
@@ -136,6 +137,7 @@ const DE = {
   'No permission to open this folder': 'Keine Berechtigung, diesen Ordner zu öffnen',
   'Choose files to upload to KevCast': 'Dateien zum Hochladen in KevCast auswählen',
   'Open a folder': 'Ordner öffnen',
+  'PowerPoint could not convert this file ({error}); the server converts it instead.': 'PowerPoint konnte diese Datei nicht umwandeln ({error}); der Server wandelt sie stattdessen um.',
 };
 const DICTS = { nl: NL, de: DE };
 
