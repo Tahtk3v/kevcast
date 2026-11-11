@@ -165,9 +165,12 @@
     ['groups', t('Groups'), 'group'],
     ['settings', t('Settings'), 'settings'],
   ];
+  /** An editor who may only work on some playlists: screens and groups are managed by others. */
+  const limited = () => Array.isArray(state.session?.user?.playlists);
+  const routes = () => ROUTES.filter((r) => !limited() || !['displays', 'groups'].includes(r[0]));
   const route = () => {
     const [page, arg] = location.hash.replace(/^#\/?/, '').split('/');
-    return { page: ROUTES.some((r) => r[0] === page) ? page : 'dashboard', arg };
+    return { page: routes().some((r) => r[0] === page) ? page : 'dashboard', arg };
   };
   const go = (hash) => { location.hash = hash; };
   window.addEventListener('hashchange', () => { document.querySelector('.shell')?.classList.remove('nav-open'); renderShell(); });
@@ -198,7 +201,7 @@
       shell = h('div', { class: 'shell' },
         h('aside', { class: 'sidebar' },
           h('div', { class: 'logo' }, h('div', { class: 'logo-mark' }, icon('display')), 'KevCast'),
-          h('nav', { class: 'nav' }, ROUTES.map(([id, label, ic]) => h('a', { href: `#/${id}`, 'data-id': id }, icon(ic), label, h('span', { class: 'badge', hidden: true })))),
+          h('nav', { class: 'nav' }, routes().map(([id, label, ic]) => h('a', { href: `#/${id}`, 'data-id': id }, icon(ic), label, h('span', { class: 'badge', hidden: true })))),
           h('div', { class: 'sidebar-foot' },
             h('div', { class: 'sidebar-user', title: `${state.session.user.username} · ${ROLE_LABEL[state.session.user.role]}` }, icon('user'), state.session.user.name),
             `${state.session.orgName} · v${state.session.version}`)),
@@ -356,17 +359,17 @@
         h('a', { class: 'btn primary', href: '#/media' }, icon('upload'), t('Upload content'))),
       ...warnings.map((w) => h('div', { class: 'alert' }, w)),
       h('div', { class: 'stats' },
-        stat(`${o.counts.online}/${o.counts.displays}`, t('Screens online'), '#/displays'),
+        stat(`${o.counts.online}/${o.counts.displays}`, t('Screens online'), limited() ? '#/dashboard' : '#/displays'),
         stat(state.media.length, t('Media files'), '#/media'),
         stat(state.playlists.length, t('Playlists'), '#/playlists'),
         stat(state.schedules.filter((s) => s.enabled !== false).length, t('Active schedules'), '#/schedule')),
-      allDone ? null : h('div', { class: 'card pad', style: { marginBottom: '16px' } },
+      allDone || limited() ? null : h('div', { class: 'card pad', style: { marginBottom: '16px' } },
         h('h2', { style: { marginBottom: '12px' } }, t('Get started in 4 steps')),
         h('div', { class: 'steps' }, steps.map(([t, s, href, done], i) =>
           h('a', { class: `step ${done ? 'done' : ''}`, href }, h('div', { class: 'n' }, done ? '✓' : i + 1), h('div', {}, h('b', {}, t), h('span', { class: 'muted small' }, s)))))),
       h('div', { class: 'dash-cols' },
         h('div', { class: 'card' },
-          h('div', { class: 'section-head' }, h('h2', {}, t('Screens')), h('div', { class: 'spacer' }), h('a', { class: 'btn sm', href: '#/displays' }, t('Manage'))),
+          h('div', { class: 'section-head' }, h('h2', {}, t('Screens')), h('div', { class: 'spacer' }), limited() ? null : h('a', { class: 'btn sm', href: '#/displays' }, t('Manage'))),
           displays.length ? displays.map((d) => {
             const pl = d.scheduledMediaId || d.scheduledPlaylistId ? contentInfo(d.scheduledMediaId ? `media:${d.scheduledMediaId}` : d.scheduledPlaylistId) : null;
             return h('div', { class: 'list-row' },
@@ -374,7 +377,7 @@
               h('div', { style: { minWidth: 0 } }, h('b', {}, d.name), h('div', { class: 'muted small' }, d.online ? (d.nowPlaying ? t('Showing: {name}{v}', { name: d.nowPlaying.name, v: d.nowPlaying.slides ? t(' (slide {slide}/{slides})', { slide: d.nowPlaying.slide, slides: d.nowPlaying.slides }) : '' }) : t('Online')) : t('Offline · last seen {v}', { v: ago(d.lastSeen) }))),
               h('div', { class: 'spacer' }),
               pl ? h('span', { class: 'row small' }, h('span', { class: 'swatch', style: { background: pl.color } }), pl.name) : h('span', { class: 'muted small' }, t('Nothing scheduled')));
-          }) : h('div', { class: 'empty' }, h('h3', {}, t('No screens yet')), h('p', {}, t('Open the player on a TV, PC or Raspberry Pi to connect it.')), h('a', { class: 'btn primary', href: '#/displays' }, t('Add a display')))),
+          }) : h('div', { class: 'empty' }, h('h3', {}, t('No screens yet')), h('p', {}, t('Open the player on a TV, PC or Raspberry Pi to connect it.')), limited() ? null : h('a', { class: 'btn primary', href: '#/displays' }, t('Add a display')))),
         h('div', { class: 'card' },
           h('div', { class: 'section-head' }, h('h2', {}, t('Recent uploads'))),
           state.media.length ? [...state.media].reverse().slice(0, 6).map((m) =>
@@ -1959,7 +1962,8 @@
     const tx = JSON.parse(JSON.stringify(targets || { displays: [], groups: [] }));
     let pid = playlistId || state.playlists[0].id;
     if (!targets && byId(state.playlists, pid)) tx.groups = groupsForPlaylist(byId(state.playlists, pid)).map((g) => g.name);
-    let mode = 'default';
+    // Restricted editors can't change screens' default content, only schedule their playlists.
+    let mode = limited() ? 'now' : 'default';
     const count = h('span', { class: 'muted small' });
     const resolveIds = () => {
       const approved = state.displays.filter((d) => d.approved);
@@ -1972,14 +1976,14 @@
     const later = new Date(now.getTime() + 60 * 60000);
     const until = h('input', { type: 'time', value: `${pad(later.getHours())}:${pad(later.getMinutes())}`, style: { width: 'auto' } });
     const untilRow = h('label', { class: 'row small' }, t('Show until'), until, h('span', { class: 'muted' }, t('today, then go back to normal')));
-    untilRow.hidden = true;
+    untilRow.hidden = mode !== 'now';
     const hint = h('p', { class: 'muted small', style: { margin: 0 } });
     const hints = {
       default: t('The playlist becomes the default content of these screens. Scheduled content still takes over at its scheduled times.'),
       now: t('Takes over these screens immediately (high priority), then they return to their normal content.'),
       schedule: t('Pick days and times in the next step.'),
     };
-    hint.textContent = hints.default;
+    hint.textContent = hints[mode];
     modal({
       title: t('Send to screens'),
       body: [
@@ -1987,7 +1991,7 @@
           h('label', { class: 'field' }, t('What should play?'), playlistSelect(pid, (v) => (pid = v), t('— choose —'))),
         h('div', { class: 'field' }, h('b', { class: 'small' }, t('Which screens?')), targetChips(tx, updateCount), count),
         h('div', { class: 'field' }, h('b', { class: 'small' }, t('How?')),
-          segmented([['default', t('Make it the default')], ['now', t('Take over now')], ['schedule', t('Schedule…')]], mode, (v) => { mode = v; untilRow.hidden = v !== 'now'; hint.textContent = hints[v]; }),
+          segmented([...(limited() ? [] : [['default', t('Make it the default')]]), ['now', t('Take over now')], ['schedule', t('Schedule…')]], mode, (v) => { mode = v; untilRow.hidden = v !== 'now'; hint.textContent = hints[v]; }),
           hint),
         untilRow,
       ],
@@ -2137,13 +2141,25 @@
 
   function userDialog(u) {
     const isNew = !u;
-    const s = { username: u?.username || '', name: u?.name || '', role: u?.role || 'editor', studio: { powerpoint: !!u?.studio?.powerpoint, replaceFonts: u?.studio?.replaceFonts !== false } };
+    const s = { username: u?.username || '', name: u?.name || '', role: u?.role || 'editor', playlists: Array.isArray(u?.playlists) ? [...u.playlists] : null, studio: { powerpoint: !!u?.studio?.powerpoint, replaceFonts: u?.studio?.replaceFonts !== false } };
     const replaceBox = h('input', { type: 'checkbox', checked: s.studio.replaceFonts, disabled: !s.studio.powerpoint, onchange: (e) => (s.studio.replaceFonts = e.target.checked) });
     const pptBox = h('input', { type: 'checkbox', checked: s.studio.powerpoint, onchange: (e) => { s.studio.powerpoint = e.target.checked; replaceBox.disabled = !e.target.checked; } });
     const username = h('input', { value: s.username, autocomplete: 'off', disabled: !isNew, oninput: (e) => (s.username = e.target.value) });
     const name = h('input', { value: s.name, placeholder: t('e.g. Sam from Marketing'), oninput: (e) => (s.name = e.target.value) });
     const pass = h('input', { type: 'password', autocomplete: 'new-password', placeholder: isNew ? '' : t('Leave empty to keep the current password') });
-    const role = h('select', { onchange: (e) => (s.role = e.target.value) },
+    // Which playlists an editor may work on: all, or only the ticked ones.
+    const picks = new Set(s.playlists || []);
+    const pickList = h('div', { class: 'pick-list', hidden: !s.playlists },
+      state.playlists.length ? state.playlists.map((p) => h('label', { class: 'check' },
+        h('input', { type: 'checkbox', checked: picks.has(p.id), onchange: (e) => { if (e.target.checked) picks.add(p.id); else picks.delete(p.id); } }),
+        h('span', { class: 'swatch', style: { background: p.color } }), p.name))
+        : h('div', { class: 'muted small' }, t('No playlists yet. Playlists this user makes are added automatically.')));
+    const accessBox = h('div', { class: 'fonts-box stack', hidden: s.role === 'admin' },
+      h('b', {}, t('Playlists')),
+      h('div', { class: 'muted small' }, t('Limit this editor to some playlists. They then see only those playlists and their schedules, and only media uploaded by people who share one of their playlists (or who have all playlists). Screens and groups they can see in the schedule, but not change.')),
+      segmented([['all', t('All playlists')], ['some', t('Only these playlists')]], s.playlists ? 'some' : 'all', (v) => { s.playlists = v === 'some' ? [] : null; pickList.hidden = v !== 'some'; }),
+      pickList);
+    const role = h('select', { onchange: (e) => { s.role = e.target.value; accessBox.hidden = s.role === 'admin'; } },
       Object.entries(ROLE_LABEL).map(([v, l]) => h('option', { value: v, selected: v === s.role }, l)));
     modal({
       title: isNew ? t('Add a user') : t('Edit {name}', { name: u.name }),
@@ -2157,6 +2173,7 @@
         h('div', { class: 'muted small' },
           h('div', {}, h('b', {}, t('Editor: ')), t('media, playlists, schedules, displays and groups.')),
           h('div', {}, h('b', {}, t('Administrator: ')), t('everything, plus users, the organisation name, the roll-out key and backups.'))),
+        accessBox,
         h('div', { class: 'fonts-box stack' },
           h('b', {}, t('KevCast Studio on Windows')),
           h('label', { class: 'check' }, pptBox, h('span', {}, t('Convert PowerPoint files with PowerPoint on this user’s computer'),
@@ -2166,8 +2183,8 @@
       footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, t('Cancel')),
         h('button', { class: 'btn primary', onclick: async () => {
           try {
-            if (isNew) await api('/users', { method: 'POST', body: { username: s.username.trim(), name: s.name, role: s.role, password: pass.value, studio: s.studio } });
-            else await api(`/users/${u.id}`, { method: 'PATCH', body: { name: s.name, role: s.role, password: pass.value, studio: s.studio } });
+            if (isNew) await api('/users', { method: 'POST', body: { username: s.username.trim(), name: s.name, role: s.role, password: pass.value, studio: s.studio, playlists: s.playlists && [...picks] } });
+            else await api(`/users/${u.id}`, { method: 'PATCH', body: { name: s.name, role: s.role, password: pass.value, studio: s.studio, playlists: s.playlists && [...picks] } });
           } catch (e) { toast(e.message, 'err'); return; }
           close();
           toast(isNew ? t('{v} can now sign in', { v: s.name || s.username }) : t('Saved'), 'ok');
@@ -2186,6 +2203,7 @@
         h('div', { style: { minWidth: 0, flex: 1 } },
           h('b', {}, u.name), u.id === me.id ? h('span', { class: 'muted small' }, t(' (you)')) : null,
           h('div', { class: 'muted small' }, u.username, ' · ', u.lastLogin ? t('last signed in {v}', { v: ago(u.lastLogin) }) : t('never signed in'))),
+        Array.isArray(u.playlists) ? h('span', { class: 'badge warn', title: u.playlists.map((id) => byId(state.playlists, id)?.name).filter(Boolean).join(', ') }, tn(u.playlists.length, '{n} playlist', '{n} playlists')) : null,
         h('span', { class: `badge ${u.role === 'admin' ? '' : 'ok'}` }, ROLE_LABEL[u.role]),
         h('button', { class: 'btn sm', onclick: () => userDialog(u) }, t('Edit')),
         u.id === me.id ? null : h('button', { class: 'btn sm danger', title: t('Remove'), onclick: async () => {

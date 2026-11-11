@@ -5,6 +5,14 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-11
+### Added
+- **Editors for some playlists only.** Under *Settings → Users → Edit → Playlists* an administrator can limit an editor
+  to some playlists. That editor sees and changes only those playlists and their schedule entries, and sees only the
+  media uploaded by people who share one of those playlists (or who have all playlists). Screens and groups are
+  read-only for them. Playlists they create are added to their list.
+- Media records who uploaded it.
+
 ## [0.7.1] - 2026-11-11
 ### Fixed
 - **Traffic slides stayed empty.** The server now fetches weather and traffic data in the background (right after a slide

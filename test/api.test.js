@@ -350,3 +350,77 @@ test('weather and traffic slides', async () => {
   await call('PATCH', `/api/media/${w.id}`, { language: 'de' });
   assert.strictEqual((await call('GET', `/api/playlists/${pl.id}/preview`)).body.items[0].lang, 'de');
 });
+
+test('editors limited to some playlists', async () => {
+  await call('POST', '/api/login', { username: 'sam', password: 'newpass1' }); // an administrator (see above)
+  const pa = (await call('POST', '/api/playlists', { name: 'Playlist A' })).body;
+  const pb = (await call('POST', '/api/playlists', { name: 'Playlist B' })).body;
+  const mk = async (username, playlists) => {
+    const u = (await call('POST', '/api/users', { username, password: 'secret123', playlists })).body;
+    await call('POST', '/api/login', { username, password: 'secret123' });
+    return { u, cookie };
+  };
+  const admin = cookie;
+  const a = await mk('anna', [pa.id]);
+  cookie = admin; const b = await mk('bert', [pb.id]);
+  cookie = admin; const c = await mk('carla', [pa.id, pb.id]);
+  cookie = admin;
+  assert.deepStrictEqual(a.u.playlists, [pa.id]);
+  const adminSlide = (await call('POST', '/api/media', { type: 'text', text: { title: 'For everyone' } })).body;
+  const as = (cookie = admin, await call('GET', '/api/session')).body;
+  assert.strictEqual(as.user.playlists, null, 'administrators have all playlists');
+
+  const add = async (who, title) => { cookie = who.cookie; return (await call('POST', '/api/media', { type: 'text', text: { title } })).body; };
+  const ma = await add(a, 'From Anna');
+  const mb = await add(b, 'From Bert');
+  const mc = await add(c, 'From Carla');
+  const sees = async (who) => { cookie = who.cookie; return (await call('GET', '/api/media')).body.map((m) => m.name).filter((n) => /^(From|For) /.test(n)).sort(); };
+  // Anna and Bert see what people with their playlist uploaded (and what came from people with all playlists).
+  assert.deepStrictEqual(await sees(a), ['For everyone', 'From Anna', 'From Carla'].sort());
+  assert.deepStrictEqual(await sees(b), ['For everyone', 'From Bert', 'From Carla'].sort());
+  assert.deepStrictEqual(await sees(c), ['For everyone', 'From Anna', 'From Bert', 'From Carla'].sort());
+
+  // Playlists: only your own.
+  cookie = a.cookie;
+  assert.deepStrictEqual((await call('GET', '/api/playlists')).body.map((p) => p.name), ['Playlist A']);
+  assert.strictEqual((await call('PUT', `/api/playlists/${pb.id}`, { name: 'Mine now' })).status, 404);
+  assert.strictEqual((await call('PUT', `/api/playlists/${pa.id}`, { items: [{ mediaId: mb.id }] })).status, 404, 'can’t add media you can’t see');
+  assert.strictEqual((await call('PUT', `/api/playlists/${pa.id}`, { items: [{ mediaId: ma.id }, { mediaId: mc.id }] })).status, 200);
+  assert.strictEqual((await call('PATCH', `/api/media/${mb.id}`, { name: 'x' })).status, 404);
+  assert.strictEqual((await call('DELETE', `/api/media/${mb.id}`)).status, 404);
+  // Carla's slide is also in Bert's playlist: Anna can't delete it from under Bert.
+  cookie = b.cookie;
+  assert.strictEqual((await call('PUT', `/api/playlists/${pb.id}`, { items: [{ mediaId: mc.id }] })).status, 200);
+  cookie = a.cookie;
+  assert.strictEqual((await call('DELETE', `/api/media/${mc.id}`)).status, 409);
+  // New playlists are hers; a group's name is reserved.
+  const own = (await call('POST', '/api/playlists', { name: 'Anna extra' })).body;
+  assert.deepStrictEqual((await call('GET', '/api/session')).body.user.playlists.sort(), [pa.id, own.id].sort());
+  await (async () => { const k = cookie; cookie = admin; await call('POST', '/api/groups', { name: 'Lobby' }); cookie = k; })();
+  assert.strictEqual((await call('POST', '/api/playlists', { name: 'lobby' })).status, 409);
+  assert.strictEqual((await call('PUT', `/api/playlists/${own.id}`, { name: 'Lobby' })).status, 409);
+
+  // Schedules: only for your playlists; screens and groups are read-only.
+  assert.strictEqual((await call('POST', '/api/schedules', { playlistId: pb.id, repeat: 'always' })).status, 400);
+  const sa = (await call('POST', '/api/schedules', { playlistId: pa.id, repeat: 'always' })).body;
+  cookie = b.cookie;
+  const sb = (await call('POST', '/api/schedules', { playlistId: pb.id, repeat: 'always' })).body;
+  assert.deepStrictEqual((await call('GET', '/api/schedules')).body.map((s) => s.id), [sb.id]);
+  assert.strictEqual((await call('DELETE', `/api/schedules/${sa.id}`)).status, 404);
+  assert.strictEqual((await call('POST', '/api/schedules/bulk', { ids: [sa.id], action: 'delete' })).status, 400);
+  assert.strictEqual((await call('GET', '/api/displays')).status, 200);
+  assert.strictEqual((await call('POST', '/api/groups', { name: 'Mine' })).status, 403);
+  assert.strictEqual((await call('POST', '/api/displays/command', { all: true, action: 'reload' })).status, 403);
+  cookie = c.cookie;
+  assert.strictEqual((await call('GET', '/api/schedules')).body.length >= 2, true);
+
+  // Back to all playlists.
+  cookie = admin;
+  assert.strictEqual((await call('PATCH', `/api/users/${a.u.id}`, { playlists: null })).body.playlists, null);
+  cookie = a.cookie;
+  assert.ok((await call('GET', '/api/playlists')).body.length >= 3);
+  // Deleting a playlist removes it from everyone's list.
+  cookie = admin;
+  await call('DELETE', `/api/playlists/${pb.id}`);
+  assert.deepStrictEqual((await call('GET', '/api/users')).body.find((u) => u.username === 'carla').playlists, [pa.id]);
+});

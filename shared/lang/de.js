@@ -756,4 +756,13 @@ KevI18n.add('de', {
   "The last update failed ({time}): {error}. Check that the server can reach the internet (see Configuration in the docs).": "Die letzte Aktualisierung ist fehlgeschlagen ({time}): {error}. Prüfen Sie, ob der Server das Internet erreicht (siehe Konfiguration in der Dokumentation).",
   "Travel times can’t be calculated right now.": "Fahrzeiten können gerade nicht berechnet werden.",
   "Updated {time}, with a problem: {error}": "Aktualisiert {time}, mit einem Problem: {error}",
+  "No playlists yet. Playlists this user makes are added automatically.": "Noch keine Playlists. Playlists, die dieser Benutzer erstellt, werden automatisch hinzugefügt.",
+  "Limit this editor to some playlists. They then see only those playlists and their schedules, and only media uploaded by people who share one of their playlists (or who have all playlists). Screens and groups they can see in the schedule, but not change.": "Diesen Redakteur auf einige Playlists beschränken. Er sieht dann nur diese Playlists und deren Zeitplan und nur Medien von Personen, die eine dieser Playlists teilen (oder alle Playlists haben). Bildschirme und Gruppen sieht er im Zeitplan, kann sie aber nicht ändern.",
+  "All playlists": "Alle Playlists",
+  "Only these playlists": "Nur diese Playlists",
+  "{n} playlist": "{n} Playlist",
+  "{n} playlists": "{n} Playlists",
+  "Your account can only work on its own playlists. Ask an administrator to change screens or groups.": "Ihr Konto kann nur mit den eigenen Playlists arbeiten. Bitten Sie einen Administrator, Bildschirme oder Gruppen zu ändern.",
+  "This is also used in playlists you don’t have access to. Remove it there first, or ask an administrator.": "Dies wird auch in Playlists verwendet, auf die Sie keinen Zugriff haben. Entfernen Sie es dort zuerst oder fragen Sie einen Administrator.",
+  "A playlist with the name of a screen group plays on those screens; only users with access to all playlists can do that. Choose another name.": "Eine Playlist mit dem Namen einer Bildschirmgruppe läuft auf diesen Bildschirmen; das dürfen nur Benutzer mit Zugriff auf alle Playlists. Wählen Sie einen anderen Namen.",
 });

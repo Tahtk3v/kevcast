@@ -341,7 +341,7 @@ const ROLES = ['admin', 'editor'];
 const STUDIO_OPTIONS = ['powerpoint', 'replaceFonts'];
 const studioOptions = (u) => ({ powerpoint: !!u.studio?.powerpoint, replaceFonts: u.studio?.replaceFonts !== false });
 const cleanStudio = (v, old = {}) => Object.fromEntries(STUDIO_OPTIONS.map((k) => [k, v && k in v ? !!v[k] : studioOptions({ studio: old })[k]]));
-const publicUser = (u) => u && { id: u.id, username: u.username, name: u.name || u.username, role: u.role, createdAt: u.createdAt, lastLogin: u.lastLogin || null, studio: studioOptions(u) };
+const publicUser = (u) => u && { id: u.id, username: u.username, name: u.name || u.username, role: u.role, playlists: accessOf(u), createdAt: u.createdAt, lastLogin: u.lastLogin || null, studio: studioOptions(u) };
 const findUser = (username) => {
   const n = String(username || '').trim().toLowerCase();
   return n ? db.list('users').find((u) => u.username.toLowerCase() === n) : null;
@@ -516,6 +516,52 @@ const admin = express.Router();
 admin.use(auth.requireUser);
 const adminOnly = auth.requireAdministrator;
 
+// Playlist access ----------------------------------------------------------------
+// A user can work on all playlists (null: administrators always, editors by default) or only on a list of them.
+// Restricted editors see and change only their playlists, the schedule entries of those playlists, and the media
+// uploaded by users who share at least one of their playlists (or by users with access to all playlists).
+// Screens and groups they can see, but not change.
+const accessOf = (u) => (!u || u.role === 'admin' || !Array.isArray(u.playlists) ? null : u.playlists);
+/** The playlists this request may use, as a Set, or null for all. */
+function scopeOf(req) {
+  const a = accessOf(req.user);
+  return a ? new Set(a) : null;
+}
+const canPlaylist = (req, id, scope = scopeOf(req)) => !scope || scope.has(id);
+/** Who uploaded this and which playlists they can use: null means all. */
+function uploaderAccess(m) {
+  if (!m.createdBy) return null; // from before uploaders were recorded: by someone with access to everything
+  const u = db.get('users', m.createdBy);
+  return u ? accessOf(u) : (m.uploaderAccess ?? null);
+}
+function canMedia(req, m, scope = scopeOf(req)) {
+  if (!scope) return true;
+  if (m.createdBy === req.user.id) return true;
+  const up = uploaderAccess(m);
+  if (up === null || up.some((id) => scope.has(id))) return true;
+  // Used in one of your playlists.
+  return [...scope].some((id) => (db.get('playlists', id)?.items || []).some((i) => i.mediaId === m.id));
+}
+const canSchedule = (req, s, scope = scopeOf(req)) => {
+  if (!scope) return true;
+  if (s.mediaId) { const m = db.get('media', s.mediaId); return !!m && canMedia(req, m, scope); }
+  return canPlaylist(req, s.playlistId, scope);
+};
+/** Changing screens and groups needs access to all playlists. */
+function fullAccessOnly(req, res, next) {
+  if (scopeOf(req)) return res.status(403).json({ error: 'Your account can only work on its own playlists. Ask an administrator to change screens or groups.' });
+  next();
+}
+/** Who uploaded it, for new media. */
+const uploadedBy = (req) => ({ createdBy: req.user.id, uploaderAccess: accessOf(req.user) });
+/** A playlist named after a screen group plays on that group, so restricted users can't pick such a name. */
+function groupNameProblem(req, name, currentName) {
+  if (!scopeOf(req) || (currentName && sameName(currentName, name))) return null;
+  return groupNames().some((g) => sameName(g, name)) ? 'A playlist with the name of a screen group plays on those screens; only users with access to all playlists can do that. Choose another name.' : null;
+}
+/** Valid playlist ids for a user's access list, or null for all playlists. */
+const cleanAccess = (v) => (Array.isArray(v) ? [...new Set(v.map(String))].filter((id) => db.get('playlists', id)) : null);
+
 admin.get('/events', (req, res) => {
   sse(res);
   adminStreams.add(res);
@@ -528,9 +574,9 @@ admin.get('/overview', (req, res) => {
     version: pkg.version,
     orgName: db.data.settings.orgName,
     counts: {
-      media: db.list('media').length,
-      playlists: db.list('playlists').length,
-      schedules: db.list('schedules').length,
+      media: db.list('media').filter((m) => canMedia(req, m)).length,
+      playlists: db.list('playlists').filter((p) => canPlaylist(req, p.id)).length,
+      schedules: db.list('schedules').filter((x) => canSchedule(req, x)).length,
       displays: db.list('displays').filter((d) => d.approved).length,
       online: db.list('displays').filter((d) => d.approved && isOnline(d)).length,
     },
@@ -548,7 +594,16 @@ admin.get('/overview', (req, res) => {
 // Media -----------------------------------------------------------------------
 const upload = multer({ dest: UPLOAD_TMP, limits: { fileSize: 4 * 1024 * 1024 * 1024 } });
 
-admin.get('/media', (req, res) => res.json(db.list('media').map(publicMedia)));
+admin.get('/media', (req, res) => {
+  const scope = scopeOf(req);
+  res.json(db.list('media').filter((m) => canMedia(req, m, scope)).map(publicMedia));
+});
+/** Media this user may see and change, or a 404 answer. */
+function mediaFor(req, res) {
+  const m = db.get('media', req.params.id);
+  if (!m || !canMedia(req, m)) { bad(res, 'Not found', 404); return null; }
+  return m;
+}
 
 admin.post('/media/upload', upload.array('files', 50), (req, res) => {
   const created = [];
@@ -572,6 +627,7 @@ admin.post('/media/upload', upload.array('files', 50), (req, res) => {
       mimetype: f.mimetype,
       status: type === 'presentation' ? 'processing' : 'ready',
       tags: [],
+      ...uploadedBy(req),
       // KevCast Studio converted a PowerPoint to this PDF with the user's own PowerPoint.
       ...(ext === '.pdf' && req.body?.convertedWith === 'PowerPoint'
         ? { convertedWith: 'PowerPoint', sourceName: String(req.body.sourceName || '').slice(0, 255) || null }
@@ -590,16 +646,16 @@ admin.post('/media', (req, res) => {
   const { type, name, url, text, zoom, refreshSeconds } = req.body || {};
   if (type === 'web') {
     if (!/^https?:\/\//i.test(url || '')) return bad(res, 'Enter a full web address starting with http:// or https://');
-    return res.json(publicMedia(db.insert('media', { type, name: name || url, url, zoom: cleanZoom(zoom), refreshSeconds: Math.max(0, Number(refreshSeconds) || 0), status: 'ready', tags: [] })));
+    return res.json(publicMedia(db.insert('media', { type, name: name || url, url, zoom: cleanZoom(zoom), refreshSeconds: Math.max(0, Number(refreshSeconds) || 0), status: 'ready', tags: [], ...uploadedBy(req) })));
   }
   if (type === 'text') {
     if (!text || !(text.title || text.body)) return bad(res, 'Add a title or some text');
-    return res.json(publicMedia(db.insert('media', { type, name: name || text.title || 'Text slide', text, status: 'ready', tags: [] })));
+    return res.json(publicMedia(db.insert('media', { type, name: name || text.title || 'Text slide', text, status: 'ready', tags: [], ...uploadedBy(req) })));
   }
   if (type === 'weather' || type === 'traffic') {
     const place = cleanPlace(req.body.place);
     if (!place) return bad(res, 'Choose a location');
-    const rec = { type, name: name || place.name, place, status: 'ready', tags: [], language: LANGS.includes(req.body.language) ? req.body.language : 'auto' };
+    const rec = { type, name: name || place.name, place, status: 'ready', tags: [], ...uploadedBy(req), language: LANGS.includes(req.body.language) ? req.body.language : 'auto' };
     if (type === 'weather') rec.weather = cleanWeatherOptions(req.body.weather);
     if (type === 'traffic') rec.destinations = cleanDestinations(req.body.destinations);
     const created = db.insert('media', rec);
@@ -639,8 +695,8 @@ admin.patch('/media/:id', (req, res) => {
   if ('url' in patch && !/^https?:\/\//i.test(patch.url || '')) return bad(res, 'Enter a full web address starting with http:// or https://');
   if ('zoom' in patch) patch.zoom = cleanZoom(patch.zoom);
   if ('refreshSeconds' in patch) patch.refreshSeconds = Math.max(0, Number(patch.refreshSeconds) || 0);
-  const before = db.get('media', req.params.id);
-  if (!before) return bad(res, 'Not found', 404);
+  const before = mediaFor(req, res);
+  if (!before) return;
   const oldMode = before.fontMode || 'auto'; // db.update changes the record in place
   // How fonts are handled when converting a PowerPoint (server/pptx.js); changing it converts again.
   if ('fontMode' in (req.body || {})) {
@@ -666,6 +722,7 @@ admin.get('/geocode', async (req, res) => {
 admin.get('/places/cities', (req, res) => res.json(liveTraffic.citiesFor(String(req.query.country || '').toLowerCase())));
 
 admin.get('/media/:id/preview', (req, res) => {
+  if (!mediaFor(req, res)) return;
   const p = expandSingle(req.params.id);
   if (!p) return bad(res, 'Not found', 404);
   res.json(p);
@@ -676,7 +733,8 @@ admin.post('/media/reconvert-all', (req, res) => {
   const onlyMissing = !!req.body?.onlyMissingFonts;
   const fontMode = req.body?.fontMode;
   if (fontMode !== undefined && !pptx.MODES.includes(fontMode)) return bad(res, 'Unknown font option');
-  const list = db.list('media').filter((m) => m.type === 'presentation' && m.status !== 'processing' && (!onlyMissing || (m.missingFonts || []).length));
+  const scope = scopeOf(req);
+  const list = db.list('media').filter((m) => canMedia(req, m, scope) && m.type === 'presentation' && m.status !== 'processing' && (!onlyMissing || (m.missingFonts || []).length));
   for (const m of list) {
     if (fontMode) m.fontMode = fontMode;
     processPresentation(m);
@@ -685,15 +743,22 @@ admin.post('/media/reconvert-all', (req, res) => {
 });
 
 admin.post('/media/:id/reconvert', (req, res) => {
-  const m = db.get('media', req.params.id);
-  if (!m || m.type !== 'presentation') return bad(res, 'Not a presentation', 404);
+  const m = mediaFor(req, res);
+  if (!m) return;
+  if (m.type !== 'presentation') return bad(res, 'Not a presentation', 404);
   processPresentation(m);
   res.json(publicMedia(m));
 });
 
 admin.delete('/media/:id', (req, res) => {
   const id = req.params.id;
-  if (!db.remove('media', id)) return bad(res, 'Not found', 404);
+  if (!mediaFor(req, res)) return;
+  const scope = scopeOf(req);
+  if (scope && (db.list('playlists').some((p) => !scope.has(p.id) && (p.items || []).some((i) => i.mediaId === id))
+    || db.list('schedules').some((x) => x.mediaId === id && !canSchedule(req, x, scope) ))) {
+    return bad(res, 'This is also used in playlists you don’t have access to. Remove it there first, or ask an administrator.', 409);
+  }
+  db.remove('media', id);
   for (const p of db.list('playlists')) p.items = (p.items || []).filter((i) => i.mediaId !== id);
   db.data.schedules = db.list('schedules').filter((x) => x.mediaId !== id);
   db.save('playlists');
@@ -717,19 +782,47 @@ function cleanItems(items) {
     }));
 }
 
-admin.get('/playlists', (req, res) => res.json(db.list('playlists')));
+admin.get('/playlists', (req, res) => {
+  const scope = scopeOf(req);
+  res.json(db.list('playlists').filter((p) => canPlaylist(req, p.id, scope)));
+});
+function playlistFor(req, res) {
+  const p = db.get('playlists', req.params.id);
+  if (!p || !canPlaylist(req, p.id)) { bad(res, 'Not found', 404); return null; }
+  return p;
+}
+/** A restricted user who makes a playlist gets access to it. */
+function grantPlaylist(req, p) {
+  if (!scopeOf(req)) return;
+  req.user.playlists = [...new Set([...req.user.playlists, p.id])];
+  db.save('users');
+}
+/** Items may only add media the user can see (what is already in the playlist stays). */
+function itemsProblem(req, items, old = []) {
+  const scope = scopeOf(req);
+  if (!scope) return null;
+  const had = new Set(old.map((i) => i.mediaId));
+  return items.some((i) => !had.has(i.mediaId) && !(db.get('media', i.mediaId) && canMedia(req, db.get('media', i.mediaId), scope))) ? 'Not found' : null;
+}
 admin.post('/playlists', (req, res) => {
   const { name, items } = req.body || {};
   const n = db.list('playlists').length;
-  res.json(db.insert('playlists', {
+  const clean = cleanItems(items);
+  const problem = groupNameProblem(req, name || '') || itemsProblem(req, clean);
+  if (problem) return bad(res, problem, problem === 'Not found' ? 404 : 409);
+  const p = db.insert('playlists', {
     name: name || `Playlist ${n + 1}`,
     color: PLAYLIST_COLORS[n % PLAYLIST_COLORS.length],
     defaultDuration: 10,
     transition: 'fade',
-    items: cleanItems(items),
-  }));
+    items: clean,
+  });
+  grantPlaylist(req, p);
+  res.json(p);
 });
 admin.put('/playlists/:id', (req, res) => {
+  const before = playlistFor(req, res);
+  if (!before) return;
   const b = req.body || {};
   const patch = {};
   if (b.name !== undefined) patch.name = String(b.name);
@@ -737,25 +830,33 @@ admin.put('/playlists/:id', (req, res) => {
   if (b.defaultDuration !== undefined) patch.defaultDuration = Math.max(1, Number(b.defaultDuration) || 10);
   if (b.transition !== undefined) patch.transition = b.transition;
   if (b.items !== undefined) patch.items = cleanItems(b.items);
+  const problem = (patch.name !== undefined && groupNameProblem(req, patch.name, before.name)) || (patch.items && itemsProblem(req, patch.items, before.items));
+  if (problem) return bad(res, problem, problem === 'Not found' ? 404 : 409);
   const p = db.update('playlists', req.params.id, patch);
   if (!p) return bad(res, 'Not found', 404);
   res.json(p);
 });
 admin.post('/playlists/:id/duplicate', (req, res) => {
-  const p = db.get('playlists', req.params.id);
-  if (!p) return bad(res, 'Not found', 404);
+  const p = playlistFor(req, res);
+  if (!p) return;
   const { id, createdAt, updatedAt, ...rest } = p;
-  res.json(db.insert('playlists', { ...rest, name: `${p.name} (copy)`, items: p.items.map((i) => ({ ...i, id: Database.id() })) }));
+  const copy = db.insert('playlists', { ...rest, name: `${p.name} (copy)`, items: p.items.map((i) => ({ ...i, id: Database.id() })) });
+  grantPlaylist(req, copy);
+  res.json(copy);
 });
 admin.delete('/playlists/:id', (req, res) => {
   const id = req.params.id;
-  if (!db.remove('playlists', id)) return bad(res, 'Not found', 404);
+  if (!playlistFor(req, res)) return;
+  db.remove('playlists', id);
+  for (const u of db.list('users')) if (Array.isArray(u.playlists)) u.playlists = u.playlists.filter((x) => x !== id);
+  db.save('users');
   db.data.schedules = db.list('schedules').filter((s) => s.playlistId !== id);
   for (const d of db.list('displays')) if (d.defaultPlaylistId === id) d.defaultPlaylistId = null;
   db.save('schedules');
   res.json({ ok: true });
 });
 admin.get('/playlists/:id/preview', (req, res) => {
+  if (!playlistFor(req, res)) return;
   const p = expandPlaylist(db.get('playlists', req.params.id));
   if (!p) return bad(res, 'Not found', 404);
   res.json(p);
@@ -810,30 +911,36 @@ function scheduleProblem(s) {
   if (s.startDate && s.endDate && s.endDate < s.startDate) return 'The end date is before the start date';
   return null;
 }
-admin.get('/schedules', (req, res) => res.json(db.list('schedules')));
+admin.get('/schedules', (req, res) => {
+  const scope = scopeOf(req);
+  res.json(db.list('schedules').filter((x) => canSchedule(req, x, scope)));
+});
 admin.post('/schedules', (req, res) => {
   const s = cleanSchedule(req.body || {});
-  const problem = scheduleProblem(s);
+  const problem = scheduleProblem(s) || (canSchedule(req, s) ? null : 'Pick a playlist, media item or web page');
   if (problem) return bad(res, problem);
   res.json(db.insert('schedules', s));
 });
 admin.put('/schedules/:id', (req, res) => {
+  const old = db.get('schedules', req.params.id);
+  if (!old || !canSchedule(req, old)) return bad(res, 'Not found', 404);
   const s = cleanSchedule(req.body || {});
-  const problem = scheduleProblem(s);
+  const problem = scheduleProblem(s) || (canSchedule(req, s) ? null : 'Pick a playlist, media item or web page');
   if (problem) return bad(res, problem);
   const out = db.update('schedules', req.params.id, s);
   if (!out) return bad(res, 'Not found', 404);
   res.json(out);
 });
 admin.delete('/schedules/:id', (req, res) => {
-  if (!db.remove('schedules', req.params.id)) return bad(res, 'Not found', 404);
+  const old = db.get('schedules', req.params.id);
+  if (!old || !canSchedule(req, old) || !db.remove('schedules', req.params.id)) return bad(res, 'Not found', 404);
   res.json({ ok: true });
 });
 
 // Displays --------------------------------------------------------------------
 admin.get('/displays', (req, res) => res.json(db.list('displays').map(publicDisplay)));
 
-admin.post('/displays/pair', (req, res) => {
+admin.post('/displays/pair', fullAccessOnly, (req, res) => {
   const code = String(req.body?.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const d = db.list('displays').find((x) => !x.approved && x.pairingCode === code);
   if (!d) return bad(res, 'No screen is showing that code. Check the code on the screen and try again.', 404);
@@ -853,7 +960,7 @@ admin.post('/displays/pair', (req, res) => {
 function selectDisplays({ ids, group, all }) {
   return db.list('displays').filter((d) => d.approved && (all || (ids || []).includes(d.id) || (group && (d.groups || []).includes(group))));
 }
-admin.post('/displays/command', (req, res) => {
+admin.post('/displays/command', fullAccessOnly, (req, res) => {
   const { action } = req.body || {};
   if (!['identify', 'reload', 'screenshot'].includes(action)) return bad(res, 'Unknown action');
   let delivered = 0;
@@ -864,7 +971,7 @@ admin.post('/displays/command', (req, res) => {
   }
   res.json({ ok: true, targeted: list.length, delivered });
 });
-admin.patch('/displays/bulk', (req, res) => {
+admin.patch('/displays/bulk', fullAccessOnly, (req, res) => {
   const allowed = ['groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'language', 'ticker', 'background', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body?.patch || {}).filter(([k]) => allowed.includes(k)));
   if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
@@ -886,7 +993,7 @@ admin.get('/displays/:id/screenshot', (req, res) => {
   res.sendFile(f);
 });
 
-admin.patch('/displays/:id', (req, res) => {
+admin.patch('/displays/:id', fullAccessOnly, (req, res) => {
   const allowed = ['name', 'groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'language', 'ticker', 'background', 'notes', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
   if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
@@ -896,7 +1003,7 @@ admin.patch('/displays/:id', (req, res) => {
   res.json(publicDisplay(d));
 });
 
-admin.post('/displays/:id/:action', (req, res) => {
+admin.post('/displays/:id/:action', fullAccessOnly, (req, res) => {
   const d = db.get('displays', req.params.id);
   if (!d) return bad(res, 'Not found', 404);
   if (!['identify', 'reload', 'screenshot'].includes(req.params.action)) return bad(res, 'Unknown action', 404);
@@ -904,7 +1011,7 @@ admin.post('/displays/:id/:action', (req, res) => {
   res.json({ ok: true, delivered: playerStreams.get(d.id)?.size || 0 });
 });
 
-admin.delete('/displays/:id', (req, res) => {
+admin.delete('/displays/:id', fullAccessOnly, (req, res) => {
   const id = req.params.id;
   toPlayer(id, 'unpaired', {});
   if (!db.remove('displays', id)) return bad(res, 'Not found', 404);
@@ -927,7 +1034,7 @@ function publicGroup(g) {
   };
 }
 admin.get('/groups', (req, res) => res.json(db.list('groups').map(publicGroup)));
-admin.post('/groups', (req, res) => {
+admin.post('/groups', fullAccessOnly, (req, res) => {
   const name = String(req.body?.name || '').trim();
   if (!name) return bad(res, 'Give the group a name');
   if (groupNames().some((n) => n.toLowerCase() === name.toLowerCase())) return bad(res, 'A group with that name already exists', 409);
@@ -941,7 +1048,7 @@ admin.post('/groups', (req, res) => {
   db.save('groups');
   res.json(publicGroup(g));
 });
-admin.patch('/groups/:id', (req, res) => {
+admin.patch('/groups/:id', fullAccessOnly, (req, res) => {
   const g = db.get('groups', req.params.id);
   if (!g) return bad(res, 'Not found', 404);
   const b = req.body || {};
@@ -960,7 +1067,7 @@ admin.patch('/groups/:id', (req, res) => {
   db.save('groups');
   res.json(publicGroup(g));
 });
-admin.post('/groups/:id/members', (req, res) => {
+admin.post('/groups/:id/members', fullAccessOnly, (req, res) => {
   const g = db.get('groups', req.params.id);
   if (!g) return bad(res, 'Not found', 404);
   const add = (req.body?.add || []).map(String);
@@ -973,7 +1080,7 @@ admin.post('/groups/:id/members', (req, res) => {
   res.json(publicGroup(g));
 });
 /** Copy every schedule entry of this group to other groups (they get their own, editable copies). */
-admin.post('/groups/:id/copy-schedule', (req, res) => {
+admin.post('/groups/:id/copy-schedule', fullAccessOnly, (req, res) => {
   const g = db.get('groups', req.params.id);
   if (!g) return bad(res, 'Not found', 404);
   const targets = (req.body?.toGroupIds || []).map((id) => db.get('groups', id)).filter((x) => x && x.id !== g.id);
@@ -989,7 +1096,7 @@ admin.post('/groups/:id/copy-schedule', (req, res) => {
   }
   res.json({ ok: true, copied });
 });
-admin.delete('/groups/:id', (req, res) => {
+admin.delete('/groups/:id', fullAccessOnly, (req, res) => {
   const g = db.get('groups', req.params.id);
   if (!g) return bad(res, 'Not found', 404);
   for (const d of db.list('displays')) d.groups = (d.groups || []).filter((x) => x !== g.name);
@@ -1000,8 +1107,10 @@ admin.delete('/groups/:id', (req, res) => {
 
 // Change many schedule entries at once.
 admin.post('/schedules/bulk', (req, res) => {
-  const { ids, action } = req.body || {};
-  const list = db.list('schedules').filter((s) => (ids || []).includes(s.id));
+  const { action } = req.body || {};
+  const scope = scopeOf(req);
+  const list = db.list('schedules').filter((s) => (req.body?.ids || []).includes(s.id) && canSchedule(req, s, scope));
+  const ids = list.map((s) => s.id);
   if (!list.length) return bad(res, 'Select at least one entry');
   if (action === 'delete') {
     db.data.schedules = db.list('schedules').filter((s) => !ids.includes(s.id));
@@ -1088,7 +1197,7 @@ admin.post('/users', adminOnly, (req, res) => {
   if (!ROLES.includes(role)) return bad(res, 'Unknown role');
   if (!password || password.length < 6) return bad(res, 'The password must be at least 6 characters');
   const name = String(req.body?.name || '').trim().slice(0, 100) || username;
-  const user = db.insert('users', { username, name, role, sv: 0, studio: cleanStudio(req.body?.studio), ...auth.hashPassword(password) });
+  const user = db.insert('users', { username, name, role, sv: 0, playlists: role === 'admin' ? null : cleanAccess(req.body?.playlists), studio: cleanStudio(req.body?.studio), ...auth.hashPassword(password) });
   res.json(publicUser(user));
 });
 admin.patch('/users/:id', adminOnly, (req, res) => {
@@ -1108,6 +1217,8 @@ admin.patch('/users/:id', adminOnly, (req, res) => {
   }
   if (name !== undefined) u.name = String(name).trim().slice(0, 100) || u.username;
   if (req.body?.studio !== undefined) u.studio = cleanStudio(req.body.studio, u.studio);
+  if (req.body && 'playlists' in req.body) u.playlists = cleanAccess(req.body.playlists);
+  if (u.role === 'admin') u.playlists = null;
   u.updatedAt = new Date().toISOString();
   db.save('users');
   if (u.id === req.user.id) auth.issue(res, u); // keep yourself signed in
