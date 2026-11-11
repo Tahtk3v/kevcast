@@ -386,8 +386,8 @@
     if (manifest) $('idleOrg').textContent = manifest.orgName || '';
   }
 
-  /** Display setting "Clock": automatic (the screen's language), 24-hour or 12-hour. */
-  function clockFormat() { return (manifest && manifest.display && manifest.display.clockFormat) || 'auto'; }
+  /** Server setting "Clock" (the same on every screen): automatic (the screen's language), 24-hour or 12-hour. */
+  function clockFormat() { return (manifest && manifest.clockFormat) || 'auto'; }
   function clockOptions() {
     const f = clockFormat();
     return f === '12' ? { hour12: true } : f === '24' ? { hourCycle: 'h23' } : {};

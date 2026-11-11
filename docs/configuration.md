@@ -83,6 +83,12 @@ from the server to:
 The server keeps the last good data, so slides keep showing something if one of these is down for a while. Without any
 internet access the slides show "No data yet".
 
+## Clock (in the admin)
+
+Under **Settings → General** an administrator sets one clock format for every screen: *Automatic* (each screen's
+language), *24-hour* or *12-hour*. It is used on the idle screen, the clock in the corner and the times on weather and
+traffic slides, so all screens look the same.
+
 ## Per-display settings (in the admin)
 
 These are set per screen under **Displays → Settings**, or for many screens at once with *Send to screens*.
@@ -96,6 +102,5 @@ These are set per screen under **Displays → Settings**, or for many screens at
 | Background | colour |
 | Show clock | on/off |
 | Language | automatic (the screen computer's language), English, Dutch or German. For the screen's messages, idle clock and weather and traffic slides. |
-| Clock | automatic (the screen's language), 24-hour or 12-hour. For the idle screen, the clock in the corner and the times on weather and traffic slides. |
 | News ticker | on/off, text (one message per line), speed (slow/normal/fast), colours |
 | Weekly restart | on/off (default on), day of the week (default Sunday), time (default 03:00). Player app only. |

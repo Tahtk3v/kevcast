@@ -13,6 +13,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
   calculated shows *Route unavailable* instead of hiding the whole slide.
 - When the data can't be fetched, the slide says why, and the slide's details in the Web Studio show when the data was
   last updated, or the error (for example when the server can't reach the internet).
+### Changed
+- **The clock format is now one setting for all screens**, under *Settings → General* (administrators): automatic,
+  24-hour or 12-hour, so every screen shows the time the same way. It replaces the per-screen *Clock* setting of 0.7.0.
 ### Added
 - **Language per screen**: *Automatic* (the screen computer's language), English, Dutch or German, under the screen's
   settings. It sets the language of the screen's messages, idle clock and weather and traffic slides.

@@ -84,7 +84,8 @@ warnings elsewhere in Europe. Untick what you don't want to show. Forecast: MET 
 8: tap the cities, or search any other place). In the Netherlands the times include current traffic jams and show
 accidents on the way (live data from NDW). Elsewhere they are normal travel times. Routes: OpenStreetMap/OSRM.
 
-- The slides follow each screen's **Language** and **Clock** setting (24-hour or 12-hour). To show one slide in another
+- The slides follow each screen's **Language** and the server's **Clock** setting (24-hour or 12-hour, under
+  **Settings → General**). To show one slide in another
   language, pick it under **Language** in the slide's settings.
 - Click the slide on the Media page to see when its data was last updated, or why it couldn't be updated.
 - The KevCast server needs internet access for these slides; the screens don't. If the internet is gone for a while,
@@ -361,7 +362,9 @@ Everyone sees:
 - **Server**: whether LibreOffice and the slide renderer were found (with install hints), version, platform and data folder.
 
 Administrators also see:
-- **General**: organisation name, shown on idle screens and in the apps.
+- **General**: organisation name, shown on idle screens and in the apps, and the **Clock**: *Automatic* (each screen's
+  language), *24-hour* or *12-hour*, the same on every screen: for the idle screen, the clock in the corner and weather
+  and traffic slides.
 - **Users**: see below.
 - **Roll out the Player app**: the provisioning key and a ready-made `player.json` (see [Enterprise roll-out](rollout.md)). **New key** replaces the key; screens that are already connected keep working.
 - **Backup**: download the database as JSON (without passwords or media).

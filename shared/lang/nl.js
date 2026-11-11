@@ -712,7 +712,7 @@ KevI18n.add('nl', {
   "No location chosen yet": "Nog geen locatie gekozen",
   "Normal travel times (current traffic only in the Netherlands)": "Normale reistijden (actuele files alleen in Nederland)",
   "Nothing found. Try a town name or postcode.": "Niets gevonden. Probeer een plaatsnaam of postcode.",
-  "On the idle screen and the clock in the corner": "Op het wachtscherm en de klok in de hoek",
+  "The same on every screen: the idle screen, the clock in the corner and weather and traffic slides. Automatic follows each screen’s language.": "Op elk scherm hetzelfde: het wachtscherm, de klok in de hoek en weer- en verkeersdia’s. Automatisch volgt de taal van elk scherm.",
   "Optional, e.g. Traffic": "Optioneel, bijv. Verkeer",
   "Optional, e.g. Weather in Utrecht": "Optioneel, bijv. Weer in Utrecht",
   "Partly cloudy": "Half bewolkt",

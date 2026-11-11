@@ -276,6 +276,10 @@ function expandSingle(mediaId) {
   return { id: `media:${m.id}`, name: m.name, items: expandMedia(m, { id: m.id }, { transition: 'fade', duration: 30 }) };
 }
 
+const CLOCK_FORMATS = ['auto', '24', '12'];
+/** The server-wide clock format (Settings → General), the same on every screen. */
+function clockFormat() { return CLOCK_FORMATS.includes(db.data.settings.clockFormat) ? db.data.settings.clockFormat : 'auto'; }
+
 function playerManifest(d) {
   const schedules = db.list('schedules').filter((s) => s.enabled !== false);
   const ids = new Set(schedules.filter((s) => s.playlistId).map((s) => s.playlistId));
@@ -298,6 +302,7 @@ function playerManifest(d) {
   return {
     serverVersion: pkg.version,
     orgName: db.data.settings.orgName,
+    clockFormat: clockFormat(),
     display,
     schedules,
     playlists,
@@ -351,6 +356,7 @@ app.get('/api/session', (req, res) => {
     setupRequired: !admins().length,
     user: publicUser(auth.currentUser(req)),
     orgName: db.data.settings.orgName,
+    clockFormat: clockFormat(),
     version: pkg.version,
   });
 });
@@ -859,7 +865,7 @@ admin.post('/displays/command', (req, res) => {
   res.json({ ok: true, targeted: list.length, delivered });
 });
 admin.patch('/displays/bulk', (req, res) => {
-  const allowed = ['groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'clockFormat', 'language', 'ticker', 'background', 'maintenance'];
+  const allowed = ['groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'language', 'ticker', 'background', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body?.patch || {}).filter(([k]) => allowed.includes(k)));
   if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
   if (patch.groups) patch.groups = ensureGroups(patch.groups);
@@ -881,7 +887,7 @@ admin.get('/displays/:id/screenshot', (req, res) => {
 });
 
 admin.patch('/displays/:id', (req, res) => {
-  const allowed = ['name', 'groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'clockFormat', 'language', 'ticker', 'background', 'notes', 'maintenance'];
+  const allowed = ['name', 'groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'language', 'ticker', 'background', 'notes', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
   if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
   if (patch.groups) patch.groups = ensureGroups(Array.isArray(patch.groups) ? patch.groups : []);
@@ -1017,8 +1023,10 @@ admin.post('/schedules/bulk', (req, res) => {
 // Settings --------------------------------------------------------------------
 admin.patch('/settings', adminOnly, (req, res) => {
   if (req.body?.orgName) db.data.settings.orgName = String(req.body.orgName);
+  // One clock format for every screen: automatic (each screen's language), 24-hour or 12-hour.
+  if (req.body && 'clockFormat' in req.body) db.data.settings.clockFormat = CLOCK_FORMATS.includes(String(req.body.clockFormat)) ? String(req.body.clockFormat) : 'auto';
   db.save('settings');
-  res.json({ ok: true });
+  res.json({ ok: true, orgName: db.data.settings.orgName, clockFormat: clockFormat() });
 });
 // Server-wide font replacements for PowerPoint conversion, e.g. [{ from: 'Corporate Sans', to: 'Arial' }].
 // Presentations that use a changed font are converted again.

@@ -712,7 +712,7 @@ KevI18n.add('de', {
   "No location chosen yet": "Noch kein Ort gewählt",
   "Normal travel times (current traffic only in the Netherlands)": "Normale Fahrzeiten (aktuelle Staus nur in den Niederlanden)",
   "Nothing found. Try a town name or postcode.": "Nichts gefunden. Versuchen Sie einen Ortsnamen oder eine Postleitzahl.",
-  "On the idle screen and the clock in the corner": "Auf dem Ruhebildschirm und der Uhr in der Ecke",
+  "The same on every screen: the idle screen, the clock in the corner and weather and traffic slides. Automatic follows each screen’s language.": "Auf allen Bildschirmen gleich: Ruhebildschirm, Uhr in der Ecke und Wetter- und Verkehrsfolien. Automatisch folgt der Sprache des jeweiligen Bildschirms.",
   "Optional, e.g. Traffic": "Optional, z. B. Verkehr",
   "Optional, e.g. Weather in Utrecht": "Optional, z. B. Wetter in Köln",
   "Partly cloudy": "Teilweise bewölkt",

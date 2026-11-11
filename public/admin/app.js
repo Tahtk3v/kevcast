@@ -724,7 +724,7 @@
     else if (m.type === 'video') preview = h('video', { src: m.url, controls: true, muted: true });
     else if (m.type === 'presentation' && m.slideUrls) preview = h('img', { src: m.slideUrls[0] });
     else if (m.type === 'web') preview = h('iframe', { src: m.url, sandbox: 'allow-scripts allow-same-origin', referrerpolicy: 'no-referrer' });
-    else if (m.type === 'weather' || m.type === 'traffic') preview = h('iframe', { src: `/widgets/${m.type}.html?id=${m.id}&lang=${m.language && m.language !== 'auto' ? m.language : window.KevI18n.lang}`, sandbox: 'allow-scripts allow-same-origin', class: 'widget-preview' });
+    else if (m.type === 'weather' || m.type === 'traffic') preview = h('iframe', { src: `/widgets/${m.type}.html?id=${m.id}&lang=${m.language && m.language !== 'auto' ? m.language : window.KevI18n.lang}&clock=${state.session.clockFormat || 'auto'}`, sandbox: 'allow-scripts allow-same-origin', class: 'widget-preview' });
     else if (m.type === 'text') preview = textPreview(m.text);
     const big = h('div', { class: 'preview-big' }, preview || (m.status === 'processing' ? h('div', { class: 'spinner' }) : icon('media')));
     const usedIn = state.playlists.filter((p) => p.items.some((i) => i.mediaId === m.id));
@@ -885,7 +885,7 @@
         h('p', { class: 'muted small', style: { margin: 0 } }, type === 'weather'
           ? t('Data: MET Norway (forecast) and MeteoAlarm (warnings). The KevCast server needs internet access; screens don’t.')
           : t('Data: OpenStreetMap/OSRM (routes) and NDW (traffic jams in the Netherlands). The KevCast server needs internet access; screens don’t.')),
-        existing ? h('a', { class: 'btn sm', href: `/widgets/${type}.html?id=${existing.id}&lang=${existing.language && existing.language !== 'auto' ? existing.language : window.KevI18n.lang}`, target: '_blank', style: { alignSelf: 'flex-start' } }, icon('play'), t('Preview on a screen')) : null,
+        existing ? h('a', { class: 'btn sm', href: `/widgets/${type}.html?id=${existing.id}&lang=${existing.language && existing.language !== 'auto' ? existing.language : window.KevI18n.lang}&clock=${state.session.clockFormat || 'auto'}`, target: '_blank', style: { alignSelf: 'flex-start' } }, icon('play'), t('Preview on a screen')) : null,
         err,
       ],
       footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, t('Cancel')),
@@ -2086,8 +2086,6 @@
         h('div', { class: 'grid2' },
           h('div', { class: 'field' }, h('b', { class: 'small' }, t('Orientation')), segmented([['landscape', t('Landscape')], ['portrait-left', t('Portrait ⟲')], ['portrait-right', t('Portrait ⟳')]], s.orientation || 'landscape', (v) => (s.orientation = v))),
           h('div', { class: 'field' }, h('b', { class: 'small' }, t('Image fit')), segmented([['contain', t('Fit (black bars)')], ['cover', t('Fill (crop)')]], s.fit || 'contain', (v) => (s.fit = v)))),
-        h('div', { class: 'field' }, h('b', { class: 'small' }, t('Clock')), h('span', { class: 'hint' }, t('On the idle screen and the clock in the corner')),
-          segmented([['auto', t('Automatic')], ['24', t('24-hour (14:30)')], ['12', t('12-hour (2:30 PM)')]], s.clockFormat || 'auto', (v) => (s.clockFormat = v))),
         h('div', { class: 'field' }, h('b', { class: 'small' }, t('Language')), h('span', { class: 'hint' }, t('Of the screen’s own texts, dates and weather and traffic slides. Automatic follows the computer.')),
           segmented([['auto', t('Automatic')], ...window.KevI18n.supported.map((c) => [c, window.KevI18n.names[c]])], s.language || 'auto', (v) => (s.language = v))),
         h('div', { class: 'row wrap', style: { gap: '20px' } },
@@ -2106,7 +2104,7 @@
         h('div', { class: 'spacer' }),
         h('button', { class: 'btn', onclick: close }, t('Cancel')),
         h('button', { class: 'btn primary', onclick: async () => {
-          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, groups: s.groups, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, clockFormat: s.clockFormat || 'auto', language: s.language || 'auto', ticker: s.ticker, background: s.background, notes: s.notes, maintenance: s.maintenance } });
+          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, groups: s.groups, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, language: s.language || 'auto', ticker: s.ticker, background: s.background, notes: s.notes, maintenance: s.maintenance } });
           close(); toast(t('Saved — the screen updates in a moment'), 'ok'); await loadAll(); renderPage();
         } }, t('Save')),
       ],
@@ -2226,6 +2224,7 @@
     const o = state.overview;
     const me = state.session.user;
     const org = h('input', { value: state.session.orgName });
+    const clock = { value: state.session.clockFormat || 'auto' };
     const cur = h('input', { type: 'password', autocomplete: 'current-password' });
     const nxt = h('input', { type: 'password', autocomplete: 'new-password' });
     const cap = (ok, label, hint) => h('div', { class: 'list-row' }, h('span', { class: `badge ${ok ? 'ok' : 'warn'}` }, ok ? 'OK' : t('Missing')), h('div', {}, h('b', {}, label), h('div', { class: 'muted small' }, ok ? ok : hint)));
@@ -2235,7 +2234,9 @@
         h('div', { class: 'stack' },
           isAdmin() ? h('div', { class: 'card pad stack' }, h('h2', {}, t('General')),
             h('label', { class: 'field' }, t('Organisation name'), h('span', { class: 'hint' }, t('Shown on idle screens')), org),
-            h('div', {}, h('button', { class: 'btn primary', onclick: async () => { await api('/settings', { method: 'PATCH', body: { orgName: org.value } }); state.session.orgName = org.value; toast(t('Saved'), 'ok'); } }, t('Save')))) : null,
+            h('div', { class: 'field' }, h('b', { class: 'small' }, t('Clock')), h('span', { class: 'hint' }, t('The same on every screen: the idle screen, the clock in the corner and weather and traffic slides. Automatic follows each screen’s language.')),
+              segmented([['auto', t('Automatic')], ['24', t('24-hour (14:30)')], ['12', t('12-hour (2:30 PM)')]], clock.value, (v) => (clock.value = v))),
+            h('div', {}, h('button', { class: 'btn primary', onclick: async () => { const r = await api('/settings', { method: 'PATCH', body: { orgName: org.value, clockFormat: clock.value } }); state.session.orgName = r.orgName; state.session.clockFormat = r.clockFormat; toast(t('Saved'), 'ok'); } }, t('Save')))) : null,
           isAdmin() ? usersCard() : null,
           h('div', { class: 'card pad stack' }, h('h2', {}, t('Your account')),
             h('div', { class: 'muted' }, h('b', {}, me.name), ` (${me.username}) · ${ROLE_LABEL[me.role]}`),
