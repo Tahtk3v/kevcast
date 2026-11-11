@@ -5,6 +5,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-11
+### Added
+- **KevCast Studio converts PowerPoints with your own PowerPoint (Windows).** An administrator turns it on per user
+  (*Settings → Users → Edit*). Studio then saves each PowerPoint as a PDF with the user's PowerPoint before uploading,
+  so the slides look exactly like the original and the server needs no fonts.
+  - *Apply the font replacements first* (on by default) applies the server's font replacements before converting.
+  - Works for Browse…, the *This computer* panel and drag and drop in Studio. Without PowerPoint, or if it fails, the
+    original is uploaded and the server converts it as before.
+  - The media details show when a PDF was made by PowerPoint, and from which file.
+- CI checks that Studio's PowerPoint script parses on Windows.
+
 ## [0.5.0] - 2026-11-11
 ### Fixed
 - **Garbled PowerPoint text with the font installed.** The garbling came from LibreOffice itself drawing those fonts

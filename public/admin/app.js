@@ -417,6 +417,11 @@
 
   function uploadFiles(files, opts = {}) {
     if (!files.length) return;
+    // In KevCast Studio, let the app upload dropped files from disk (and convert PowerPoints when enabled).
+    if (studio?.pathForFile) {
+      const paths = files.map((f) => studio.pathForFile(f));
+      if (paths.every(Boolean)) return uploadLocal(paths, opts);
+    }
     if (!opts.addTo && route().page !== 'media') go('#/media');
     const created = [];
     let pending = files.length;
@@ -456,12 +461,17 @@
       const u = rows.get(ev.path);
       if (!u) return;
       u.progress = ev.size ? ev.loaded / ev.size : 1;
-      if (ev.status === 'done') { u.done = true; u.progress = 1; toast(t('Uploaded {name}{v}', { name: u.name, v: /\.(pptx?|ppsx?|potx?|odp|key|pdf)$/i.test(u.name) ? t(' — converting slides…') : '' }), 'ok'); }
+      u.converting = ev.status === 'converting';
+      if (ev.warning) toast(`${u.name}: ${ev.warning}`, 'err');
+      if (ev.status === 'done' && ev.convertedWith) { u.done = true; u.progress = 1; toast(t('Uploaded {name} — converted with PowerPoint on this computer', { name: u.name }), 'ok'); }
+      else if (ev.status === 'done') { u.done = true; u.progress = 1; toast(t('Uploaded {name}{v}', { name: u.name, v: /\.(pptx?|ppsx?|potx?|odp|key|pdf)$/i.test(u.name) ? t(' — converting slides…') : '' }), 'ok'); }
       if (ev.status === 'error') { u.done = true; u.error = ev.error; toast(`${u.name}: ${ev.error}`, 'err'); }
       drawUploads();
     });
     let created = [];
-    try { created = await studio.upload(paths); } catch (e) { toast(e.message, 'err'); }
+    const me = state.session.user;
+    const uploadOpts = { powerpoint: !!me.studio?.powerpoint, replaceFonts: me.studio?.replaceFonts !== false, fontReplacements: state.overview?.fontReplacements || [] };
+    try { created = await studio.upload(paths, uploadOpts); } catch (e) { toast(e.message, 'err'); }
     off();
     setTimeout(() => { state.uploads = state.uploads.filter((x) => ![...rows.values()].includes(x) || x.error); drawUploads(); }, 900);
     setTimeout(() => { state.uploads = state.uploads.filter((x) => ![...rows.values()].includes(x)); drawUploads(); }, 6000);
@@ -503,6 +513,9 @@
           h('div', { class: 'spacer' }),
           h('button', { class: 'btn sm', onclick: () => pickFiles() }, icon('upload'), t('Browse…')),
           h('button', { class: 'btn sm ghost', onclick: () => { L.open = false; draw(); } }, t('Hide'))),
+        state.session.user.studio?.powerpoint && L.caps ? h('div', { class: `ppt-note small ${L.caps.powerpoint ? 'on' : ''}` }, icon('presentation'), L.caps.powerpoint
+          ? t('PowerPoint files are converted to PDF with PowerPoint on this computer before uploading.')
+          : t('PowerPoint isn’t installed on this computer, so the server converts PowerPoint files.')) : null,
         h('div', { class: 'local-body' },
           h('div', { class: 'local-places' },
             places.places.map((p) => h('button', { class: `local-place ${lst && lst.path === p.path ? 'on' : ''}`, onclick: () => open(p.path) }, p.label)),
@@ -534,6 +547,7 @@
     draw();
     if (!L.places) {
       studio.places().then((p) => { L.places = p; if (!L.dir) open(p.lastFolder); else draw(); });
+      if (studio.capabilities && !L.caps) studio.capabilities().then((c) => { L.caps = c; draw(); }).catch(() => {});
     }
     return box;
   }
@@ -544,7 +558,7 @@
     box.replaceChildren(...state.uploads.map((u) => h('div', { class: 'card upload-row' },
       h('b', { class: 'small', style: { minWidth: '160px' } }, u.name),
       h('div', { class: 'bar' }, h('i', { style: { width: `${Math.round(u.progress * 100)}%`, background: u.error ? 'var(--danger)' : '' } })),
-      h('span', { class: 'small muted' }, u.error ? u.error : u.done ? t('Done') : `${Math.round(u.progress * 100)}%`))));
+      h('span', { class: 'small muted' }, u.error ? u.error : u.done ? t('Done') : u.converting ? t('Converting with PowerPoint…') : `${Math.round(u.progress * 100)}%`))));
   }
 
   // Drag files anywhere on the page to upload.
@@ -715,6 +729,9 @@
         m.status === 'error' ? h('div', { class: 'alert' }, h('b', {}, t('Conversion failed: ')), t(m.error || '')) : null,
         m.missingFonts?.length && m.status === 'ready' ? h('div', { class: 'alert' }, h('b', {}, t('Missing on the server: {v}. ', { v: m.missingFonts.join(', ') })), t('These slides use a replacement font, so text can look different or be misplaced. '), FONT_HELP) : null,
         m.status === 'ready' ? fontsSection(m, () => closeDialog()) : null,
+        m.convertedWith === 'PowerPoint' ? h('div', { class: 'muted small' }, icon('presentation'), ' ', m.sourceName
+          ? t('Converted to PDF by PowerPoint on the uploader’s computer, from “{file}”.', { file: m.sourceName })
+          : t('Converted to PDF by PowerPoint on the uploader’s computer.')) : null,
         m.slideUrls && m.slideUrls.length > 1 ? h('div', { class: 'slides-strip' }, m.slideUrls.map((u) => h('img', { src: u, loading: 'lazy', onclick: () => big.replaceChildren(h('img', { src: u })) }))) : null,
         h('label', { class: 'field' }, t('Name'), name),
         h('div', { class: 'muted small' },
@@ -2021,7 +2038,9 @@
 
   function userDialog(u) {
     const isNew = !u;
-    const s = { username: u?.username || '', name: u?.name || '', role: u?.role || 'editor' };
+    const s = { username: u?.username || '', name: u?.name || '', role: u?.role || 'editor', studio: { powerpoint: !!u?.studio?.powerpoint, replaceFonts: u?.studio?.replaceFonts !== false } };
+    const replaceBox = h('input', { type: 'checkbox', checked: s.studio.replaceFonts, disabled: !s.studio.powerpoint, onchange: (e) => (s.studio.replaceFonts = e.target.checked) });
+    const pptBox = h('input', { type: 'checkbox', checked: s.studio.powerpoint, onchange: (e) => { s.studio.powerpoint = e.target.checked; replaceBox.disabled = !e.target.checked; } });
     const username = h('input', { value: s.username, autocomplete: 'off', disabled: !isNew, oninput: (e) => (s.username = e.target.value) });
     const name = h('input', { value: s.name, placeholder: t('e.g. Sam from Marketing'), oninput: (e) => (s.name = e.target.value) });
     const pass = h('input', { type: 'password', autocomplete: 'new-password', placeholder: isNew ? '' : t('Leave empty to keep the current password') });
@@ -2038,12 +2057,18 @@
           h('label', { class: 'field' }, t('Role'), role)),
         h('div', { class: 'muted small' },
           h('div', {}, h('b', {}, t('Editor: ')), t('media, playlists, schedules, displays and groups.')),
-          h('div', {}, h('b', {}, t('Administrator: ')), t('everything, plus users, the organisation name, the roll-out key and backups.')))),
+          h('div', {}, h('b', {}, t('Administrator: ')), t('everything, plus users, the organisation name, the roll-out key and backups.'))),
+        h('div', { class: 'fonts-box stack' },
+          h('b', {}, t('KevCast Studio on Windows')),
+          h('label', { class: 'check' }, pptBox, h('span', {}, t('Convert PowerPoint files with PowerPoint on this user’s computer'),
+            h('div', { class: 'muted small' }, t('Studio saves each PowerPoint as a PDF with the user’s own PowerPoint before uploading, so slides look exactly like the original and the server needs no fonts. Without PowerPoint on that computer, the server converts as usual.')))),
+          h('label', { class: 'check', style: { marginLeft: '24px' } }, replaceBox, h('span', {}, t('Apply the font replacements first'),
+            h('div', { class: 'muted small' }, t('The server’s font replacements (Settings → Server) are applied before PowerPoint converts the file.')))))),
       footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, t('Cancel')),
         h('button', { class: 'btn primary', onclick: async () => {
           try {
-            if (isNew) await api('/users', { method: 'POST', body: { username: s.username.trim(), name: s.name, role: s.role, password: pass.value } });
-            else await api(`/users/${u.id}`, { method: 'PATCH', body: { name: s.name, role: s.role, password: pass.value } });
+            if (isNew) await api('/users', { method: 'POST', body: { username: s.username.trim(), name: s.name, role: s.role, password: pass.value, studio: s.studio } });
+            else await api(`/users/${u.id}`, { method: 'PATCH', body: { name: s.name, role: s.role, password: pass.value, studio: s.studio } });
           } catch (e) { toast(e.message, 'err'); return; }
           close();
           toast(isNew ? t('{v} can now sign in', { v: s.name || s.username }) : t('Saved'), 'ok');

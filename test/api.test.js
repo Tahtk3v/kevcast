@@ -287,3 +287,28 @@ test('font replacements and font options', async () => {
   await call('POST', '/api/login', { username: 'ed', password: 'secret123' });
   assert.strictEqual((await call('PUT', '/api/font-replacements', [])).status, 403);
 });
+
+test('Studio options per user, and PDFs converted by PowerPoint', async () => {
+  await call('POST', '/api/login', { username: 'sam', password: 'newpass1' }); // administrator
+  const u = (await call('POST', '/api/users', { username: 'lisa', password: 'secret123', studio: { powerpoint: true } })).body;
+  assert.deepStrictEqual(u.studio, { powerpoint: true, replaceFonts: true }, 'font replacements are applied first by default');
+  const p = (await call('PATCH', `/api/users/${u.id}`, { studio: { replaceFonts: false } })).body;
+  assert.deepStrictEqual(p.studio, { powerpoint: true, replaceFonts: false }, 'only the given option changes');
+  await call('POST', '/api/login', { username: 'lisa', password: 'secret123' });
+  assert.deepStrictEqual((await call('GET', '/api/session')).body.user.studio, { powerpoint: true, replaceFonts: false });
+
+  // KevCast Studio uploads the PDF with two extra form fields.
+  const upload = async (name, type, fields) => {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+    fd.append('files', new Blob([type === 'pdf' ? '%PDF-1.4\n%%EOF\n' : 'png'], { type: type === 'pdf' ? 'application/pdf' : 'image/png' }), name);
+    const res = await fetch(base + '/api/media/upload', { method: 'POST', headers: { cookie }, body: fd });
+    return (await res.json()).created[0];
+  };
+  const pdf = await upload('Eindejaarsactie.pdf', 'pdf', { convertedWith: 'PowerPoint', sourceName: 'Eindejaarsactie.pptx' });
+  assert.strictEqual(pdf.name, 'Eindejaarsactie');
+  assert.strictEqual(pdf.convertedWith, 'PowerPoint');
+  assert.strictEqual(pdf.sourceName, 'Eindejaarsactie.pptx');
+  const img = await upload('photo.png', 'png', { convertedWith: 'PowerPoint' });
+  assert.strictEqual(img.convertedWith, undefined, 'only PDFs can be marked');
+});

@@ -79,3 +79,20 @@ test('other formats are left alone', () => {
   assert.strictEqual(pptx.prepare('/nonexistent/file.ppt', 'arial', () => false), null);
   assert.deepStrictEqual(pptx.embeddedFonts('/nonexistent/file.pdf'), []);
 });
+
+test('KevCast Studio has an identical copy of the rewriter', () => {
+  const server = fs.readFileSync(path.join(__dirname, '..', 'server', 'pptx.js'), 'utf8');
+  const desktop = fs.readFileSync(path.join(__dirname, '..', 'desktop', 'common', 'pptx.js'), 'utf8');
+  assert.strictEqual(desktop.split('\n').slice(1).join('\n'), server, 'copy server/pptx.js to desktop/common/pptx.js (keep its first comment line)');
+});
+
+test('PowerPoint conversion in Studio: script and availability', async () => {
+  const ppt = require('../desktop/studio/powerpoint');
+  assert.ok(ppt.SCRIPT.includes('SaveAs($Out, 32)'), 'ppSaveAsPDF');
+  assert.ok(ppt.SCRIPT.includes('$hadOpen -eq 0'), 'leaves a PowerPoint the user has open alone');
+  assert.ok(ppt.isPowerPoint('Deck.PPTX') && ppt.isPowerPoint('a.ppsx') && !ppt.isPowerPoint('a.pdf') && !ppt.isPowerPoint('a.odp'));
+  if (process.platform !== 'win32') {
+    assert.strictEqual(await ppt.isAvailable(), false);
+    await assert.rejects(ppt.toPdf('x.pptx', os.tmpdir()), /not installed/);
+  }
+});
