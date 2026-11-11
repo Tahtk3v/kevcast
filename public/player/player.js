@@ -312,12 +312,16 @@
         frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms');
         frame.setAttribute('referrerpolicy', 'no-referrer');
         Object.assign(frame.style, { width: `${100 / z}%`, height: `${100 / z}%`, transform: `scale(${z})`, transformOrigin: '0 0' });
-        frame.src = item.url;
+        // KevCast's own weather/traffic slides get the screen's language and clock setting.
+        const url = item.widget
+          ? `${item.url}&lang=${encodeURIComponent((window.KevI18n && window.KevI18n.lang) || 'en')}&clock=${encodeURIComponent(clockFormat())}`
+          : item.url;
+        frame.src = url;
         el.appendChild(frame);
         // An iframe only starts loading once it is in the page, so show it right away.
         ok();
         if (item.refreshSeconds > 0) {
-          el._refresh = setInterval(() => { frame.src = item.url; }, Math.max(10, item.refreshSeconds) * 1000);
+          el._refresh = setInterval(() => { frame.src = url; }, Math.max(10, item.refreshSeconds) * 1000);
         }
       } else if (item.type === 'text') {
         const t = item.text || {};
@@ -373,9 +377,16 @@
     if (manifest) $('idleOrg').textContent = manifest.orgName || '';
   }
 
+  /** Display setting "Clock": automatic (the screen's language), 24-hour or 12-hour. */
+  function clockFormat() { return (manifest && manifest.display && manifest.display.clockFormat) || 'auto'; }
+  function clockOptions() {
+    const f = clockFormat();
+    return f === '12' ? { hour12: true } : f === '24' ? { hourCycle: 'h23' } : {};
+  }
+
   function tickClock() {
     const now = new Date();
-    const time = now.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
+    const time = now.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', ...clockOptions() });
     $('clock').textContent = time;
     $('idleTime').textContent = time;
     $('idleDate').textContent = now.toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });

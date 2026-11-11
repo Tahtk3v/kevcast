@@ -1,0 +1,67 @@
+/* KevCast weather and traffic slides: designed for a TV at a distance, landscape or portrait. */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif; color: #f8fafc;
+  background: radial-gradient(circle at 15% 0%, #1d4ed8 0%, #0f172a 55%, #020617 100%); font-size: 2.2vmin; }
+.page { height: 100%; display: flex; flex-direction: column; padding: 4vmin 5vmin 2.5vmin; gap: 3vmin; }
+h1 { margin: 0; font-size: 5vmin; font-weight: 800; letter-spacing: -0.02em; }
+.sub { color: #94a3b8; font-size: 2.4vmin; margin-top: 0.4vmin; }
+.head { display: flex; align-items: flex-start; gap: 3vmin; }
+.head .spacer { flex: 1; }
+.icon { display: inline-block; line-height: 0; }
+.icon svg { width: 100%; height: 100%; }
+.foot { margin-top: auto; display: flex; gap: 2vmin; color: #64748b; font-size: 1.7vmin; }
+.foot .spacer { flex: 1; }
+.stale { color: #fbbf24; }
+#status { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 10vmin; font-size: 3vmin; color: #cbd5e1; }
+
+/* Weather */
+.now { display: flex; align-items: center; gap: 3vmin; }
+.now .icon { width: 18vmin; height: 18vmin; }
+.now .temp { font-size: 15vmin; font-weight: 800; line-height: 1; letter-spacing: -0.04em; }
+.now .what { font-size: 3.4vmin; font-weight: 600; }
+.now .extra { color: #cbd5e1; font-size: 2.4vmin; margin-top: 1vmin; display: flex; gap: 2.5vmin; align-items: center; }
+.wind-arrow { display: inline-block; width: 2.6vmin; height: 2.6vmin; }
+.warnings { display: flex; flex-direction: column; gap: 1.2vmin; max-width: 62vmin; }
+.warning { border-radius: 1.4vmin; padding: 1.4vmin 2vmin; color: #111827; }
+.warning b { display: block; font-size: 2.6vmin; }
+.warning span { font-size: 1.9vmin; opacity: .85; }
+.warning.yellow { background: #fde047; } .warning.orange { background: #fb923c; } .warning.red { background: #ef4444; color: #fff; }
+.warning.info { background: rgba(255,255,255,.12); color: #e2e8f0; }
+.hours { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1vmin; background: rgba(255,255,255,.06); border-radius: 2vmin; padding: 2vmin 1.5vmin; }
+.hour { display: flex; flex-direction: column; align-items: center; gap: .6vmin; font-size: 2vmin; color: #cbd5e1; }
+.hour .icon { width: 6vmin; height: 6vmin; }
+.hour b { font-size: 2.8vmin; color: #fff; }
+.hour .rain { color: #60a5fa; font-size: 1.7vmin; min-height: 2vmin; }
+.days { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1.5vmin; }
+.day { background: rgba(255,255,255,.06); border-radius: 2vmin; padding: 2vmin; display: flex; flex-direction: column; align-items: center; gap: .8vmin; }
+.day .name { font-size: 2.6vmin; font-weight: 700; text-transform: capitalize; }
+.day .icon { width: 9vmin; height: 9vmin; }
+.day .range { font-size: 3vmin; font-weight: 700; } .day .range small { color: #94a3b8; font-weight: 500; }
+.day .rain { color: #60a5fa; font-size: 2vmin; min-height: 2.4vmin; }
+
+/* Traffic */
+.routes { display: flex; flex-direction: column; gap: 1.6vmin; }
+.route { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0.6vmin 3vmin; background: rgba(255,255,255,.06);
+  border-radius: 2vmin; padding: 2vmin 2.6vmin; border-left: 1vmin solid #22c55e; }
+.route.slow { border-left-color: #f59e0b; } .route.jam { border-left-color: #ef4444; }
+.route .to { font-size: 3.6vmin; font-weight: 700; }
+.route .via { display: flex; gap: 1vmin; margin-top: .6vmin; }
+.road { background: #fff; color: #b91c1c; border-radius: .8vmin; padding: .1vmin 1vmin; font-weight: 800; font-size: 2vmin; }
+.road.n { color: #ca8a04; }
+.route .time { text-align: right; font-size: 5vmin; font-weight: 800; line-height: 1; }
+.route .time small { display: block; font-size: 2vmin; color: #94a3b8; font-weight: 500; margin-top: .6vmin; }
+.route .delay { color: #fca5a5; }
+.route .jams { grid-column: 1 / -1; color: #fcd34d; font-size: 2.1vmin; }
+@media (orientation: portrait) {
+  body { font-size: 2.6vmin; }
+  .page { gap: 4vmin; }
+  .head { flex-direction: column; }
+  .hours { grid-template-columns: repeat(4, 1fr); row-gap: 3vmin; padding: 3vmin 2vmin; }
+  .hour { font-size: 2.6vmin; } .hour .icon { width: 9vmin; height: 9vmin; } .hour b { font-size: 3.6vmin; }
+  .days { grid-template-columns: 1fr; gap: 1.2vmin; }
+  .day { flex-direction: row; justify-content: space-between; padding: 1.6vmin 3vmin; }
+  .day .name { width: 14vmin; text-align: left; } .day .icon { width: 8vmin; height: 8vmin; }
+  .day .rain { width: 12vmin; text-align: right; }
+  .route .to { font-size: 4.2vmin; } .route .time { font-size: 6vmin; }
+}

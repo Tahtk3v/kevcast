@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KevCast weather</title>
+  <link rel="stylesheet" href="widget.css">
+  <script>window.KEVCAST_LANG = new URLSearchParams(location.search).get('lang') || undefined;</script>
+  <script src="/shared/i18n.js"></script>
+</head>
+<body>
+  <div class="page" id="page"></div>
+  <div id="status" hidden></div>
+  <script src="widget.js"></script>
+  <script>
+  (function () {
+    const { el, t, fmtTime, fmtHour, fmtDay, weatherIcon, symbolText } = KevWidget;
+    const deg = (n) => `${Math.round(n)}°`;
+    const mm = (n) => (n >= 0.1 ? `${n >= 10 ? Math.round(n) : Math.round(n * 10) / 10} mm` : '');
+    const arrow = (from) => {
+      const s = el('span', 'wind-arrow');
+      s.innerHTML = `<svg viewBox="0 0 24 24" style="transform:rotate(${(from + 180) % 360}deg)"><path d="M12 2l6 14h-5v6h-2v-6H6z" fill="#cbd5e1"/></svg>`;
+      return s;
+    };
+    function render(d) {
+      const o = d.options || { hourly: true, days: true, warnings: true };
+      const today = d.daily && d.daily[0];
+      const warnings = o.warnings ? (d.warnings || []) : [];
+      const page = document.getElementById('page');
+      page.replaceChildren(
+        el('div', 'head',
+          el('div', '',
+            el('h1', '', d.name || d.place.name),
+            el('div', 'now',
+              weatherIcon(d.current.symbol),
+              el('div', '', el('div', 'temp', deg(d.current.temperature)),
+                el('div', 'what', symbolText(d.current.symbol)),
+                el('div', 'extra',
+                  today ? el('span', '', t('Today {max} / {min}', { max: deg(today.max), min: deg(today.min) })) : null,
+                  el('span', '', arrow(d.current.windFrom), ` ${Math.round(d.current.windSpeed * 3.6)} km/h`),
+                  today && today.precipitation >= 0.1 ? el('span', '', `☂ ${mm(today.precipitation)}`) : null)))),
+          el('div', 'spacer'),
+          warnings.length ? el('div', 'warnings', warnings.slice(0, 3).map((w) => el('div', `warning ${w.level}`,
+            el('b', '', w.headline),
+            el('span', '', [w.level === 'info' ? '' : `${t(`Code ${w.level}`)} · `, w.onset ? t('{from} – {until}', { from: fmtTime(w.onset), until: fmtTime(w.expires) }) : t('until {until}', { until: fmtTime(w.expires) })].join(''))))) : null),
+        o.hourly && d.hourly && d.hourly.length ? el('div', 'hours', d.hourly.slice(0, 12).map((h) => el('div', 'hour',
+          el('span', '', fmtHour(h.time)), weatherIcon(h.symbol), el('b', '', deg(h.temperature)), el('span', 'rain', mm(h.precipitation))))) : null,
+        o.days && d.daily && d.daily.length > 1 ? el('div', 'days', d.daily.slice(1, 6).map((x) => el('div', 'day',
+          el('div', 'name', fmtDay(x.date)), weatherIcon(x.symbol),
+          el('div', 'range', deg(x.max), ' ', el('small', '', deg(x.min))), el('div', 'rain', mm(x.precipitation))))) : null,
+        el('div', 'foot',
+          el('span', '', t('Weather: {sources}', { sources: (d.sources || []).join(' · ') })),
+          el('span', 'spacer'),
+          d.stale ? el('span', 'stale', t('Last update {time}', { time: fmtTime(d.updated) })) : el('span', '', t('Updated {time}', { time: fmtTime(d.updated) }))));
+    }
+    KevWidget.run(render, 10 * 60 * 1000);
+  })();
+  </script>
+</body>
+</html>

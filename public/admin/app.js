@@ -34,6 +34,9 @@
     display: '<path d="M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7v2H8v2h8v-2h-2v-2h7a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18z"/>',
     settings: '<path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.38 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>',
     user: '<path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4z"/>',
+    weather: '<path d="M6.5 19A4.5 4.5 0 0 1 6 10.03 6 6 0 0 1 17.6 8.5 4.5 4.5 0 1 1 17.5 19z"/>',
+    traffic: '<path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11a2 2 0 0 1 2 2v4h-2v2h-2v-2H7v2H5v-2H3v-4a2 2 0 0 1 2-2zm2.1 0h9.8l-1.1-3.4a.5.5 0 0 0-.5-.6H8.7a.5.5 0 0 0-.5.4zM6.5 15a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zm11 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>',
+    check: '<path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/>',
     plus: '<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/>',
     upload: '<path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>',
     image: '<path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5z"/>',
@@ -92,7 +95,7 @@
     return new Date(iso).toLocaleDateString(LOCALE);
   };
   const DAYS = [t('Sun'), t('Mon'), t('Tue'), t('Wed'), t('Thu'), t('Fri'), t('Sat')];
-  const TYPE_LABEL = { image: t('Image'), video: t('Video'), presentation: t('PowerPoint'), web: t('Web page'), text: t('Text') };
+  const TYPE_LABEL = { image: t('Image'), video: t('Video'), presentation: t('PowerPoint'), web: t('Web page'), text: t('Text'), weather: t('Weather'), traffic: t('Traffic') };
 
   // ---------------------------------------------------------------------------
   // State + data loading
@@ -307,6 +310,8 @@
       const x = m.text || {};
       tx.append(h('div', { class: 'text-thumb', style: { background: x.bg2 ? `linear-gradient(135deg, ${x.bg}, ${x.bg2})` : x.bg || '#1e1b4b', color: x.fg || '#fff' } },
         h('b', {}, x.title || ''), small ? null : h('span', {}, (x.body || '').slice(0, 80))));
+    } else if (m.type === 'weather' || m.type === 'traffic') {
+      tx.append(h('div', { class: `live-thumb ${m.type}` }, icon(m.type), h('b', {}, m.place?.name || '')));
     } else tx.append(icon(m.type === 'web' ? 'web' : 'media'));
     if (!small) {
       tx.append(h('span', { class: 'badge ov' }, TYPE_LABEL[m.type] || m.type));
@@ -652,9 +657,9 @@
   }
 
   function MediaPage() {
-    const filters = [['all', t('All')], ['image', t('Images')], ['video', t('Videos')], ['presentation', t('PowerPoint & PDF')], ['web', t('Web pages')], ['text', t('Text')]];
+    const filters = [['all', t('All')], ['image', t('Images')], ['video', t('Videos')], ['presentation', t('PowerPoint & PDF')], ['web', t('Web pages')], ['text', t('Text')], ['live', t('Weather & traffic')]];
     const q = state.mediaSearch.toLowerCase();
-    const list = state.media.filter((m) => (state.mediaFilter === 'all' || m.type === state.mediaFilter) && (!q || m.name.toLowerCase().includes(q))).reverse();
+    const list = state.media.filter((m) => (state.mediaFilter === 'all' || m.type === state.mediaFilter || (state.mediaFilter === 'live' && ['weather', 'traffic'].includes(m.type))) && (!q || m.name.toLowerCase().includes(q))).reverse();
     const search = h('input', { type: 'search', placeholder: t('Search media…'), value: state.mediaSearch,
       oninput: (e) => { state.mediaSearch = e.target.value; const pos = e.target.selectionStart; renderPage({ soft: true }); const s = document.querySelector('.toolbar input[type=search]'); s.focus(); s.setSelectionRange(pos, pos); } });
     setTimeout(drawUploads);
@@ -670,6 +675,8 @@
       pageHead(t('Media'), t('Everything you can show on a screen.'),
         h('button', { class: 'btn', onclick: () => webDialog() }, icon('web'), t('Web page')),
         h('button', { class: 'btn', onclick: () => textDialog() }, icon('text'), t('Text slide')),
+        h('button', { class: 'btn', onclick: () => liveDialog('weather') }, icon('weather'), t('Weather')),
+        h('button', { class: 'btn', onclick: () => liveDialog('traffic') }, icon('traffic'), t('Traffic')),
         h('button', { class: 'btn primary', onclick: () => pickFiles() }, icon('upload'), t('Upload files'))),
       h('div', { class: 'dropzone', onclick: () => pickFiles() },
         h('b', {}, t('Drag & drop files here')), t(' or click to browse'), h('br'),
@@ -717,6 +724,7 @@
     else if (m.type === 'video') preview = h('video', { src: m.url, controls: true, muted: true });
     else if (m.type === 'presentation' && m.slideUrls) preview = h('img', { src: m.slideUrls[0] });
     else if (m.type === 'web') preview = h('iframe', { src: m.url, sandbox: 'allow-scripts allow-same-origin', referrerpolicy: 'no-referrer' });
+    else if (m.type === 'weather' || m.type === 'traffic') preview = h('iframe', { src: `/widgets/${m.type}.html?id=${m.id}&lang=${window.KevI18n.lang}`, sandbox: 'allow-scripts allow-same-origin', class: 'widget-preview' });
     else if (m.type === 'text') preview = textPreview(m.text);
     const big = h('div', { class: 'preview-big' }, preview || (m.status === 'processing' ? h('div', { class: 'spinner' }) : icon('media')));
     const usedIn = state.playlists.filter((p) => p.items.some((i) => i.mediaId === m.id));
@@ -743,6 +751,8 @@
         m.type === 'presentation' ? h('button', { class: 'btn', onclick: async () => { await api(`/media/${m.id}/reconvert`, { method: 'POST' }); close(); toast(t('Converting again…')); } }, icon('refresh'), t('Re-convert')) : null,
         m.type === 'text' ? h('button', { class: 'btn', onclick: () => { close(); textDialog(m); } }, t('Edit text')) : null,
         m.type === 'web' ? h('button', { class: 'btn', onclick: () => { close(); webDialog(m); } }, t('Edit web page')) : null,
+        m.type === 'weather' ? h('button', { class: 'btn', onclick: () => { close(); liveDialog('weather', m); } }, t('Edit weather')) : null,
+        m.type === 'traffic' ? h('button', { class: 'btn', onclick: () => { close(); liveDialog('traffic', m); } }, t('Edit traffic')) : null,
         h('button', { class: 'btn', title: t('Schedule this item on its own'), onclick: () => { close(); scheduleDialog({ mediaId: m.id }); } }, icon('schedule'), t('Schedule')),
         addToPlaylistControl(m),
         h('div', { class: 'spacer' }),
@@ -789,6 +799,86 @@
               [[0, t('Never (the page updates itself)')], [60, t('Every minute')], [300, t('Every 5 minutes')], [900, t('Every 15 minutes')], [3600, t('Every hour')]]
                 .map(([v, l]) => h('option', { value: v, selected: v === refresh }, l))))),
         existing ? h('a', { class: 'btn sm', href: `/player/?preview=media:${existing.id}`, target: '_blank', style: { alignSelf: 'flex-start' } }, icon('play'), t('Preview on a screen')) : null,
+        err,
+      ],
+      footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, t('Cancel')),
+        h('button', { class: 'btn', onclick: () => save(true, close) }, icon('schedule'), existing ? t('Save & schedule') : t('Add & schedule')),
+        h('button', { class: 'btn primary', onclick: () => save(false, close) }, existing ? t('Save') : t('Add'))],
+    });
+  }
+
+  /** Pick a place by name (OpenStreetMap search on the server). onPick(place) gets { name, lat, lon, country, region }. */
+  function placePicker(current, onPick, placeholder) {
+    const q = h('input', { type: 'search', placeholder: placeholder || t('Town, address or postcode'), value: '' });
+    const results = h('div', { class: 'place-results' });
+    const chosen = h('div', { class: 'place-chosen' });
+    const showChosen = (p) => chosen.replaceChildren(...(p ? [icon('check'), h('b', {}, p.name), h('span', { class: 'muted small' }, ` ${p.label || p.region || ''}`)] : [h('span', { class: 'muted small' }, t('No location chosen yet'))]));
+    if (current !== undefined) showChosen(current);
+    const go = async () => {
+      if (q.value.trim().length < 2) return;
+      results.replaceChildren(h('div', { class: 'muted small' }, t('Searching…')));
+      try {
+        const list = await api(`/geocode?q=${encodeURIComponent(q.value.trim())}&lang=${encodeURIComponent(window.KevI18n.lang)}`);
+        results.replaceChildren(...(list.length ? list.map((p) => h('button', { type: 'button', class: 'place-result', onclick: () => { results.replaceChildren(); q.value = ''; if (current !== undefined) showChosen(p); onPick(p); } },
+          h('b', {}, p.name), h('span', { class: 'muted small' }, p.label))) : [h('div', { class: 'muted small' }, t('Nothing found. Try a town name or postcode.'))]));
+      } catch (e) { results.replaceChildren(h('div', { class: 'err-text' }, e.message)); }
+    };
+    q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    return h('div', { class: 'stack', style: { gap: '6px' } }, current !== undefined ? chosen : null, h('div', { class: 'row' }, q, h('button', { type: 'button', class: 'btn', onclick: go }, t('Search'))), results);
+  }
+
+  /** Weather and traffic slides: KevCast fetches the data (MET Norway, MeteoAlarm, OSRM, NDW); you pick the place. */
+  function liveDialog(type, existing) {
+    const s = { name: existing?.name || '', place: existing?.place || null, weather: Object.assign({ hourly: true, days: true, warnings: true }, existing?.weather || {}),
+      destinations: (existing?.destinations || []).slice(), auto: !(existing?.destinations || []).length };
+    const name = h('input', { value: s.name, placeholder: type === 'weather' ? t('Optional, e.g. Weather in Utrecht') : t('Optional, e.g. Traffic'), oninput: (e) => (s.name = e.target.value) });
+    const err = h('div', { class: 'err-text' });
+    const destBox = h('div', { class: 'stack', style: { gap: '8px' } });
+    let cities = [];
+    const loadCities = async () => { cities = s.place?.country ? await api(`/places/cities?country=${s.place.country}`).catch(() => []) : []; drawDest(); };
+    const isSel = (c) => s.destinations.some((d) => d.name === c.name);
+    function drawDest() {
+      if (type !== 'traffic') return;
+      destBox.replaceChildren(
+        h('label', { class: 'check' }, h('input', { type: 'radio', name: 'dest-mode', checked: s.auto, onchange: () => { s.auto = true; drawDest(); } }), h('span', {}, t('The nearest big cities (automatic)'))),
+        h('label', { class: 'check' }, h('input', { type: 'radio', name: 'dest-mode', checked: !s.auto, onchange: () => { s.auto = false; drawDest(); } }), h('span', {}, t('Choose destinations (up to 8)'))),
+        s.auto ? null : h('div', { class: 'stack', style: { gap: '8px', marginLeft: '24px' } },
+          cities.length ? h('div', { class: 'chips' }, cities.map((c) => h('button', { type: 'button', class: `chip ${isSel(c) ? 'on' : ''}`, onclick: () => {
+            s.destinations = isSel(c) ? s.destinations.filter((d) => d.name !== c.name) : [...s.destinations, c].slice(0, 8); drawDest();
+          } }, c.name))) : null,
+          h('div', { class: 'chips' }, s.destinations.filter((d) => !cities.some((c) => c.name === d.name)).map((d) => h('span', { class: 'chip on' }, d.name, ' ',
+            h('a', { href: '#', onclick: (e) => { e.preventDefault(); s.destinations = s.destinations.filter((x) => x !== d); drawDest(); } }, '✕')))),
+          placePicker(undefined, (p) => { s.destinations = [...s.destinations, p].slice(0, 8); drawDest(); }, t('Add another place…'))));
+    }
+    const save = async (thenSchedule, close) => {
+      err.textContent = '';
+      if (!s.place) { err.textContent = t('Choose a location'); return; }
+      if (type === 'traffic' && !s.auto && !s.destinations.length) { err.textContent = t('Choose at least one destination'); return; }
+      const body = { name: s.name.trim() || s.place.name, place: s.place };
+      if (type === 'weather') body.weather = s.weather;
+      if (type === 'traffic') body.destinations = s.auto ? [] : s.destinations;
+      try {
+        const m = existing ? await api(`/media/${existing.id}`, { method: 'PATCH', body }) : await api('/media', { method: 'POST', body: { type, ...body } });
+        close(); await loadAll(); renderPage(); toast(existing ? t('Saved') : type === 'weather' ? t('Weather added') : t('Traffic added'), 'ok');
+        if (thenSchedule) scheduleDialog({ mediaId: m.id });
+      } catch (e) { err.textContent = e.message; }
+    };
+    const check = (key, label) => h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: s.weather[key], onchange: (e) => (s.weather[key] = e.target.checked) }), h('span', {}, label));
+    loadCities();
+    modal({
+      title: type === 'weather' ? (existing ? t('Edit weather') : t('Add weather')) : (existing ? t('Edit traffic') : t('Add traffic')),
+      body: [
+        h('p', { class: 'muted', style: { margin: 0 } }, type === 'weather'
+          ? t('The weather now, today hour by hour, the next 5 days and official weather warnings (KNMI in the Netherlands) for a place. Updated automatically.')
+          : t('Travel times by car from a place to big cities, including current traffic jams in the Netherlands. Updated every few minutes.')),
+        h('div', { class: 'field' }, h('b', { class: 'small' }, t('Location')), placePicker(s.place, (p) => { s.place = p; loadCities(); })),
+        type === 'weather' ? h('div', { class: 'field' }, h('b', { class: 'small' }, t('Show')), check('hourly', t('Today, hour by hour')), check('days', t('The next 5 days')), check('warnings', t('Weather warnings'))) : null,
+        type === 'traffic' ? h('div', { class: 'field' }, h('b', { class: 'small' }, t('Destinations')), destBox) : null,
+        h('label', { class: 'field' }, t('Name'), name),
+        h('p', { class: 'muted small', style: { margin: 0 } }, type === 'weather'
+          ? t('Data: MET Norway (forecast) and MeteoAlarm (warnings). The KevCast server needs internet access; screens don’t.')
+          : t('Data: OpenStreetMap/OSRM (routes) and NDW (traffic jams in the Netherlands). The KevCast server needs internet access; screens don’t.')),
+        existing ? h('a', { class: 'btn sm', href: `/widgets/${type}.html?id=${existing.id}&lang=${window.KevI18n.lang}`, target: '_blank', style: { alignSelf: 'flex-start' } }, icon('play'), t('Preview on a screen')) : null,
         err,
       ],
       footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, t('Cancel')),
@@ -1989,6 +2079,8 @@
         h('div', { class: 'grid2' },
           h('div', { class: 'field' }, h('b', { class: 'small' }, t('Orientation')), segmented([['landscape', t('Landscape')], ['portrait-left', t('Portrait ⟲')], ['portrait-right', t('Portrait ⟳')]], s.orientation || 'landscape', (v) => (s.orientation = v))),
           h('div', { class: 'field' }, h('b', { class: 'small' }, t('Image fit')), segmented([['contain', t('Fit (black bars)')], ['cover', t('Fill (crop)')]], s.fit || 'contain', (v) => (s.fit = v)))),
+        h('div', { class: 'field' }, h('b', { class: 'small' }, t('Clock')), h('span', { class: 'hint' }, t('On the idle screen and the clock in the corner')),
+          segmented([['auto', t('Automatic')], ['24', t('24-hour (14:30)')], ['12', t('12-hour (2:30 PM)')]], s.clockFormat || 'auto', (v) => (s.clockFormat = v))),
         h('div', { class: 'row wrap', style: { gap: '20px' } },
           h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!s.showClock, onchange: (e) => (s.showClock = e.target.checked) }), t('Show clock')),
           h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: s.ticker.enabled, onchange: (e) => { s.ticker.enabled = e.target.checked; tickerBox.hidden = !e.target.checked; } }), t('Show news ticker')),
@@ -2005,7 +2097,7 @@
         h('div', { class: 'spacer' }),
         h('button', { class: 'btn', onclick: close }, t('Cancel')),
         h('button', { class: 'btn primary', onclick: async () => {
-          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, groups: s.groups, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, ticker: s.ticker, background: s.background, notes: s.notes, maintenance: s.maintenance } });
+          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, groups: s.groups, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, clockFormat: s.clockFormat || 'auto', ticker: s.ticker, background: s.background, notes: s.notes, maintenance: s.maintenance } });
           close(); toast(t('Saved — the screen updates in a moment'), 'ok'); await loadAll(); renderPage();
         } }, t('Save')),
       ],

@@ -72,6 +72,24 @@ Click **Text slide** to make an announcement without PowerPoint. You set:
 - one of six colour presets, or your own background gradient and text colour
 - alignment (centre or left) and size (S, M or L)
 
+### Weather and traffic slides
+Click **Weather** or **Traffic** on the Media page, search for the place (town, address or postcode) and click **Add**.
+KevCast keeps the slides up to date by itself; the screens show them like any other item in a playlist or schedule.
+
+**Weather** shows the weather now, today hour by hour, the next 5 days and the official weather warnings for that
+place: KNMI's *code geel/oranje/rood* in the Netherlands (and KNMI's fog notices), and the national weather service's
+warnings elsewhere in Europe. Untick what you don't want to show. Forecast: MET Norway; warnings: MeteoAlarm.
+
+**Traffic** shows travel times by car from the place to the nearest big cities, or to destinations you choose (up to
+8: tap the cities, or search any other place). In the Netherlands the times include current traffic jams and show
+accidents on the way (live data from NDW). Elsewhere they are normal travel times. Routes: OpenStreetMap/OSRM.
+
+- The slides follow each screen's language, and its **Clock** setting (24-hour or 12-hour) for times.
+- The KevCast server needs internet access for these slides; the screens don't. If the internet is gone for a while,
+  the slides keep the last data they had. See [Configuration](configuration.md#internet-access-for-weather-and-traffic-slides)
+  for the addresses to allow in a firewall.
+- For a traffic site or map from elsewhere (ANWB, a traffic camera, …), add it as a **Web page** instead.
+
 ### Managing media
 Click a card to open its details. From there you can:
 

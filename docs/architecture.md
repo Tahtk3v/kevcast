@@ -25,6 +25,8 @@
 | `server/index.js` | Express app: static files, admin API, player API, SSE hubs, UDP discovery |
 | `server/db.js` | JSON-file database with atomic writes (`db.json.tmp` → rename) and change listeners |
 | `server/auth.js` | User accounts (scrypt-hashed passwords), roles and an HMAC-signed session cookie |
+| `server/live/` | Weather (MET Norway forecast, MeteoAlarm warnings matched by polygon) and traffic (OSRM routes, NDW jams matched onto the route by position and direction) for the weather and traffic slides. Cached, keeping the last good data. |
+| `public/widgets/` | The weather and traffic slides: pages the player shows like a web page; data from `/api/widgets/:id` |
 | `server/convert.js` | Finds LibreOffice/Poppler/Ghostscript and converts presentations. Conversions run one at a time. |
 | `shared/schedule.js` | Schedule resolution (UMD). Used by the server, the admin and the player. |
 | `public/admin/` | Admin single-page app with no build step |
@@ -129,7 +131,7 @@ A client sends the UDP datagram `KEVCAST_DISCOVER` to port 41234 on:
 
 Each server replies to the sender with JSON:
 ```json
-{ "kevcast": true, "id": "server-instance-id", "name": "Acme HQ", "version": "0.6.0", "port": 8080, "urls": ["http://192.168.1.20:8080"] }
+{ "kevcast": true, "id": "server-instance-id", "name": "Acme HQ", "version": "0.7.0", "port": 8080, "urls": ["http://192.168.1.20:8080"] }
 ```
 The client uses the address the reply came from, de-duplicates by `id`, and prefers a LAN address over loopback.
 

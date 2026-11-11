@@ -10,6 +10,7 @@
 | `DISCOVERY_PORT` | `41234` | UDP port for automatic discovery by the Player and Studio apps |
 | `SOFFICE_PATH` | auto-detected | Full path to LibreOffice's `soffice` (`soffice.exe` on Windows) |
 | `PDFTOPPM_PATH` | auto-detected | Full path to Poppler's `pdftoppm` |
+| `HTTPS_PROXY` + `NODE_USE_ENV_PROXY=1` | – | Only if the server reaches the internet through a proxy, for weather and traffic slides. Set both: Node.js uses the proxy only with `NODE_USE_ENV_PROXY=1`. |
 
 Auto-detection looks at `PATH` and the usual install folders:
 - `C:\Program Files\LibreOffice`
@@ -66,6 +67,22 @@ Lookup order for every key, first match wins:
 Same folders as `player.json`. Supports `server`.
 KevCast Studio also accepts `--server=…` and `KEVCAST_SERVER`.
 
+## Internet access for weather and traffic slides
+
+Screens never need the internet. The **server** does, for weather and traffic slides only. Allow outgoing HTTPS (port 443)
+from the server to:
+
+| Host | Used for | Terms |
+|---|---|---|
+| `api.met.no` | Weather forecast (MET Norway, yr.no) | Free, no account, commercial use allowed; credit "MET Norway" (shown on the slide) |
+| `feeds.meteoalarm.org` | Official weather warnings (KNMI in the Netherlands, DWD in Germany, …) | Free, no account; credit MeteoAlarm (shown on the slide) |
+| `nominatim.openstreetmap.org` | Finding a place by name when you set up a slide | Free, no account; light use only (KevCast sends at most one search per second) |
+| `router.project-osrm.org` | Routes and normal travel times | Free demo service of the OSRM project, meant for light use; KevCast keeps each route for 24 hours |
+| `opendata.ndw.nu` | Current traffic jams and accidents in the Netherlands (NDW, the national road data portal) | Open data, no account; refreshed every 3 minutes |
+
+The server keeps the last good data, so slides keep showing something if one of these is down for a while. Without any
+internet access the slides show "No data yet".
+
 ## Per-display settings (in the admin)
 
 These are set per screen under **Displays → Settings**, or for many screens at once with *Send to screens*.
@@ -78,5 +95,6 @@ These are set per screen under **Displays → Settings**, or for many screens at
 | Image fit | `contain` (fit) or `cover` (fill) |
 | Background | colour |
 | Show clock | on/off |
+| Clock | automatic (the screen's language), 24-hour or 12-hour. For the idle screen, the clock in the corner and the times on weather and traffic slides. |
 | News ticker | on/off, text (one message per line), speed (slow/normal/fast), colours |
 | Weekly restart | on/off (default on), day of the week (default Sunday), time (default 03:00). Player app only. |

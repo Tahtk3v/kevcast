@@ -55,6 +55,9 @@ curl -b kc.txt http://server:8080/api/displays
 | POST | `/api/media/upload` | `multipart/form-data`, field `files` (up to 50 files) | `{ created: [...], rejected: [names] }` |
 | POST | `/api/media` | `{ type: 'web', url, name?, zoom?, refreshSeconds? }` or `{ type: 'text', text: { title, body, bg, bg2, fg, align, size }, name? }` | The media item |
 | PATCH | `/api/media/:id` | `{ name?, url?, text?, tags?, zoom?, refreshSeconds?, fontMode? }` | The media item. `fontMode` (PowerPoint): `auto` (as in the file) or `arial` (Arial for all text); changing it converts the file again. Presentations also report `fontsUsed`, `missingFonts`, `embeddedFonts` and `replacedFonts`. |
+| GET | `/api/geocode?q=&lang=` | – | Places matching a name (OpenStreetMap): `[{ name, label, lat, lon, country, region }]` |
+| GET | `/api/places/cities?country=nl` | – | Big cities offered as traffic destinations |
+| GET | `/api/widgets/:id?lang=` | – | Data of a weather or traffic slide. **No login needed** (the slides load it on screens); 404 for other media. |
 | GET | `/api/media/:id/preview` | – | The item as players receive it (used by `/player/?preview=media:<id>`) |
 | POST | `/api/media/:id/reconvert` | – | Converts a presentation again |
 | POST | `/api/media/reconvert-all` | `{ onlyMissingFonts?, fontMode? }` | Converts every presentation again (or only those with missing fonts), optionally setting their `fontMode`: `{ count }` |
