@@ -19,11 +19,14 @@
     const road = (r) => el('span', `road ${/^N/i.test(r) ? 'n' : ''}`, r);
     function render(d) {
       const page = document.getElementById('page');
-      const routes = (d.routes || []).filter((r) => !r.error);
+      const routes = d.routes || [];
+      const ok = routes.filter((r) => !r.error);
       page.replaceChildren(
         el('div', 'head', el('div', '', el('h1', '', d.name && d.name !== d.origin.name ? d.name : t('Travel times from {place}', { place: d.origin.name })),
           el('div', 'sub', d.live ? t('Including current traffic jams') : d.liveAvailable ? t('Current traffic jams are unavailable right now') : t('Normal travel times (current traffic only in the Netherlands)')))),
-        el('div', 'routes', routes.map((r) => {
+        !ok.length ? el('div', 'notice', t('Travel times can’t be calculated right now.'), routes[0] && routes[0].error ? ` (${routes[0].error})` : '') : null,
+        el('div', 'routes', ok.length ? routes.map((r) => {
+          if (r.error) return el('div', 'route failed', el('div', '', el('div', 'to', r.name)), el('div', 'time', t('Route unavailable')));
           const cls = r.delayMin >= 10 ? 'jam' : r.delayMin >= 3 ? 'slow' : '';
           const jams = (r.jams || []).filter((j) => j.delayMin > 0 || j.kind === 'accident');
           return el('div', `route ${cls}`,
@@ -35,7 +38,7 @@
               j.lengthKm ? ` · ${j.lengthKm} km` : '',
               j.delayMin ? ` · +${j.delayMin} min` : '',
             ].join('')).join('   ·   ')) : null);
-        })),
+        }) : []),
         el('div', 'foot',
           el('span', '', t('Routes: {sources}', { sources: (d.sources || []).join(' · ') })),
           el('span', 'spacer'),

@@ -370,3 +370,4 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .place-result { text-align: left; display: flex; flex-direction: column; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); cursor: pointer; font: inherit; color: inherit; }
 .place-result:hover { border-color: var(--accent); background: var(--accent-2); }
 .preview-big iframe.widget-preview { width: 100%; aspect-ratio: 16/9; border: 0; }
+.alert.ok { background: rgba(22,163,74,.08); border-color: rgba(22,163,74,.3); }

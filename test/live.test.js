@@ -91,3 +91,17 @@ test('geometry', () => {
   assert.ok(!geo.inPolygon({ lat: 53, lon: 5.2 }, [[52, 5], [52, 5.4], [52.2, 5.4], [52.2, 5]]));
   assert.ok(geo.distanceToLine({ lat: 52.0, lon: 5.01 }, [[5.0, 52.0], [5.02, 52.0]]) < 1);
 });
+
+test('cache: keeps the last good data, and remembers a failure briefly', async () => {
+  const { cached } = require('../server/live/http');
+  const c = cached(0); // always refresh
+  let calls = 0;
+  assert.deepStrictEqual(await c('k', async () => { calls++; return { v: 1 }; }), { v: 1 });
+  const stale = await c('k', async () => { calls++; throw new Error('down'); });
+  assert.deepStrictEqual([stale.v, stale.stale, stale.error], [1, true, 'down'], 'old data, marked stale');
+  const d = cached(60000);
+  await assert.rejects(d('x', async () => { calls++; throw new Error('offline'); }), /offline/);
+  const before = calls;
+  await assert.rejects(d('x', async () => { calls++; return 1; }), /offline/, 'a failed source is not asked again for a minute');
+  assert.strictEqual(calls, before);
+});

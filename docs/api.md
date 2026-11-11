@@ -21,7 +21,7 @@ curl -b kc.txt http://server:8080/api/displays
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| GET | `/api/session` | – | `{ setupRequired, user: { id, username, name, role }, orgName, version }` |
+| GET | `/api/session` | – | `{ setupRequired, user: { id, username, name, role }, orgName, clockFormat, version }` |
 | POST | `/api/setup` | `{ username, password, orgName? }` | Creates the first administrator (only while there is none; 409 afterwards) |
 | POST | `/api/login` | `{ username, password }` | Sets the session cookie. The username is not case-sensitive. Rate-limited. |
 | POST | `/api/logout` | – | Clears the cookie |
@@ -31,7 +31,7 @@ curl -b kc.txt http://server:8080/api/displays
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | GET | `/api/overview` | – | Counts, capabilities (LibreOffice/Poppler paths), `playerUrls`, `serverUrls`, `provisioningKey` (`null` for editors), version, platform, data folder |
-| PATCH | `/api/settings` | `{ orgName }` | `{ ok }` (*admin*) |
+| PATCH | `/api/settings` | `{ orgName?, clockFormat?: "auto" \| "24" \| "12" }` | `{ ok, orgName, clockFormat }` (*admin*) |
 | POST | `/api/password` | `{ current, next }` | `{ ok }`. Changes your own password and ends your other sessions. |
 | POST | `/api/provisioning-key/rotate` | – | `{ provisioningKey }` (*admin*) |
 | PUT | `/api/font-replacements` | `[{ from, to? }]` | Replaces the server-wide font replacements for PowerPoint conversion (`to` defaults to Arial); presentations using a changed font are converted again: `{ replacements, reconverting }` (*admin*). The current list is in `/api/overview` as `fontReplacements`. |
@@ -134,7 +134,7 @@ An item looks like `{ mediaId, duration, transition?, enabled?, mute? }`:
 |---|---|---|---|
 | GET | `/api/displays` | – | List with `online`, `scheduledPlaylistId`, `scheduleId`, `groupPlaylistId` (playlist named after one of its groups), `effectivePlaylistId` (what plays when nothing is scheduled), `nowPlaying`, `cache`, `screenshotAt` (tokens are never returned) |
 | POST | `/api/displays/pair` | `{ code, name?, groups?: [], defaultPlaylistId? }` | The approved display |
-| PATCH | `/api/displays/:id` | Any of `{ name, groups, defaultPlaylistId, orientation, fit, showClock, ticker, background, notes, maintenance }` | The display |
+| PATCH | `/api/displays/:id` | Any of `{ name, groups, defaultPlaylistId, orientation, fit, showClock, language, ticker, background, notes, maintenance }` | The display |
 | PATCH | `/api/displays/bulk` | `{ ids?: [], group?: "name", all?: true, addGroups?: [], removeGroups?: [], patch: { groups, defaultPlaylistId, orientation, fit, showClock, ticker, background, maintenance } }` | `{ updated }` |
 | POST | `/api/displays/:id/identify` · `/reload` · `/screenshot` | – | `{ delivered }`: 1 if the screen is online |
 | POST | `/api/displays/command` | `{ action: 'identify'\|'reload'\|'screenshot', ids?, group?, all? }` | `{ targeted, delivered }` |

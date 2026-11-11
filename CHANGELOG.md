@@ -5,6 +5,22 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-11
+### Fixed
+- **Traffic slides stayed empty.** The server now fetches weather and traffic data in the background (right after a slide
+  is added and every 2 minutes), fetches the routes and the jam data at the same time, and stops waiting for a slow
+  source after 15 seconds. A slide shows *Loading…* the first time instead of nothing, and a route that can't be
+  calculated shows *Route unavailable* instead of hiding the whole slide.
+- When the data can't be fetched, the slide says why, and the slide's details in the Web Studio show when the data was
+  last updated, or the error (for example when the server can't reach the internet).
+### Changed
+- **The clock format is now one setting for all screens**, under *Settings → General* (administrators): automatic,
+  24-hour or 12-hour, so every screen shows the time the same way. It replaces the per-screen *Clock* setting of 0.7.0.
+### Added
+- **Language per screen**: *Automatic* (the screen computer's language), English, Dutch or German, under the screen's
+  settings. It sets the language of the screen's messages, idle clock and weather and traffic slides.
+- **Language per weather or traffic slide**, to show one slide in another language than the screen.
+
 ## [0.7.0] - 2026-11-11
 ### Added
 - **Weather slides.** The weather now, today hour by hour and the next 5 days for a place you search, with the official

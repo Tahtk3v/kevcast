@@ -112,13 +112,13 @@ function warningsFor(feed, place, lang = 'en', now = new Date()) {
 async function weather(place, lang = 'en') {
   const lat = Number(place.lat).toFixed(4); // MET Norway asks for at most 4 decimals
   const lon = Number(place.lon).toFixed(4);
-  const met = await forecastCache(`${lat},${lon}`, async () => ({ data: await getJson(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`), fetched: new Date().toISOString() }));
+  const met = await forecastCache(`${lat},${lon}`, async () => ({ data: await getJson(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat}&lon=${lon}`, { timeout: 15000 }), fetched: new Date().toISOString() }));
   const feedName = METEOALARM[place.country];
   let warnings = [];
   let warningsError = null;
   if (feedName) {
     try {
-      const feed = await warningsCache(feedName, () => getJson(`https://feeds.meteoalarm.org/api/v1/warnings/feeds-${feedName}`));
+      const feed = await warningsCache(feedName, () => getJson(`https://feeds.meteoalarm.org/api/v1/warnings/feeds-${feedName}`, { timeout: 15000 }));
       warnings = warningsFor(feed, place, lang);
     } catch (e) {
       warningsError = e.message;
