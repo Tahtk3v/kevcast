@@ -4,6 +4,12 @@ All notable changes to KevCast are listed here. The format follows [Keep a Chang
 and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- **Editors for some playlists only.** Under *Settings → Users → Edit → Playlists* an administrator can limit an editor
+  to some playlists. That editor sees and changes only those playlists and their schedule entries, and sees only the
+  media uploaded by people who share one of those playlists (or who have all playlists). Screens and groups are
+  read-only for them. Playlists they create are added to their list.
+- Media records who uploaded it.
 
 ## [0.7.1] - 2026-11-11
 ### Fixed

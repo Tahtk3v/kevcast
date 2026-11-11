@@ -371,3 +371,5 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .place-result:hover { border-color: var(--accent); background: var(--accent-2); }
 .preview-big iframe.widget-preview { width: 100%; aspect-ratio: 16/9; border: 0; }
 .alert.ok { background: rgba(22,163,74,.08); border-color: rgba(22,163,74,.3); }
+.pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 14px; max-height: 220px; overflow: auto; }
+.pick-list .check { align-items: center; gap: 8px; }

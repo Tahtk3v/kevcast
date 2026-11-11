@@ -378,7 +378,7 @@ Give everyone who manages the screens their own account: **Settings â†’ Users â†
 
 | Role | Can |
 |---|---|
-| **Editor** | Upload and manage media, playlists, schedules, displays and groups. Send content to screens. |
+| **Editor** | Upload and manage media, playlists, schedules, displays and groups. Send content to screens. Can be limited to some playlists (see below). |
 | **Administrator** | Everything an editor can, plus add, change and remove users, change the organisation name, see and replace the roll-out key, and download backups. |
 
 - Usernames are not case-sensitive.
@@ -390,6 +390,24 @@ Give everyone who manages the screens their own account: **Settings â†’ Users â†
 - **KevCast Studio on Windows** (per user): *Convert PowerPoint files with PowerPoint on this user's computer* makes
   Studio save PowerPoints as PDF with the user's own PowerPoint before uploading, so they look exactly like the original.
   See [KevCast Studio](studio.md#powerpoint-converted-on-your-own-computer-windows).
+
+#### Editors for some playlists only
+
+Under **Playlists** in an editor's settings, choose **Only these playlists** and tick the playlists they work on (for
+example one per department or location). Such an editor:
+
+- sees and changes only those playlists. Playlists they make themselves are added to their list.
+- sees only the schedule entries of those playlists, and can schedule them or send them to screens (*Take over now* or
+  *Scheduleâ€¦*).
+- sees only the media uploaded by people who share at least one of their playlists, by people with all playlists
+  (administrators, for instance), by themselves, and media that is in one of their playlists. So if Anna has
+  playlist A, Bert playlist B and Carla both, Anna sees Carla's uploads but not Bert's, and Carla sees both.
+- can't change screens or groups (the *Displays* and *Groups* pages are hidden) and can't give a playlist the name of a
+  screen group, because such a playlist plays on that group.
+- can't delete media that is also used in a playlist they don't have.
+
+Administrators always have all playlists. Choose **All playlists** to lift the limit. Media uploaded before this setting existed counts
+as uploaded by someone with all playlists, so everyone sees it.
 
 ### Language
 

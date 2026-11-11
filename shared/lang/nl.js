@@ -756,4 +756,13 @@ KevI18n.add('nl', {
   "The last update failed ({time}): {error}. Check that the server can reach the internet (see Configuration in the docs).": "De laatste update is mislukt ({time}): {error}. Controleer of de server het internet kan bereiken (zie Configuratie in de documentatie).",
   "Travel times can’t be calculated right now.": "Reistijden kunnen nu niet worden berekend.",
   "Updated {time}, with a problem: {error}": "Bijgewerkt {time}, met een probleem: {error}",
+  "No playlists yet. Playlists this user makes are added automatically.": "Nog geen afspeellijsten. Afspeellijsten die deze gebruiker maakt, worden automatisch toegevoegd.",
+  "Limit this editor to some playlists. They then see only those playlists and their schedules, and only media uploaded by people who share one of their playlists (or who have all playlists). Screens and groups they can see in the schedule, but not change.": "Beperk deze redacteur tot een paar afspeellijsten. Die ziet dan alleen die afspeellijsten en hun planning, en alleen media die zijn geüpload door mensen die een van die afspeellijsten delen (of die alle afspeellijsten hebben). Schermen en groepen zijn zichtbaar in de planning, maar niet te wijzigen.",
+  "All playlists": "Alle afspeellijsten",
+  "Only these playlists": "Alleen deze afspeellijsten",
+  "{n} playlist": "{n} afspeellijst",
+  "{n} playlists": "{n} afspeellijsten",
+  "Your account can only work on its own playlists. Ask an administrator to change screens or groups.": "Je account kan alleen met de eigen afspeellijsten werken. Vraag een beheerder om schermen of groepen te wijzigen.",
+  "This is also used in playlists you don’t have access to. Remove it there first, or ask an administrator.": "Dit wordt ook gebruikt in afspeellijsten waar je geen toegang toe hebt. Haal het daar eerst weg, of vraag een beheerder.",
+  "A playlist with the name of a screen group plays on those screens; only users with access to all playlists can do that. Choose another name.": "Een afspeellijst met de naam van een schermgroep speelt op die schermen; dat kunnen alleen gebruikers met toegang tot alle afspeellijsten. Kies een andere naam.",
 });
