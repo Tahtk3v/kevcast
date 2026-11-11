@@ -749,4 +749,11 @@ KevI18n.add('de', {
   "{h} h {m} min": "{h} Std. {m} Min.",
   "{m} min": "{m} Min.",
   "Could not search for places: the server can’t reach OpenStreetMap": "Ortssuche nicht möglich: Der Server erreicht OpenStreetMap nicht",
+  "Automatic uses each screen’s language": "Automatisch verwendet die Sprache des jeweiligen Bildschirms",
+  "Data updated {time}.": "Daten aktualisiert {time}.",
+  "Of the screen’s own texts, dates and weather and traffic slides. Automatic follows the computer.": "Für die eigenen Texte des Bildschirms, Datumsangaben sowie Wetter- und Verkehrsfolien. Automatisch folgt dem Computer.",
+  "Route unavailable": "Route nicht verfügbar",
+  "The last update failed ({time}): {error}. Check that the server can reach the internet (see Configuration in the docs).": "Die letzte Aktualisierung ist fehlgeschlagen ({time}): {error}. Prüfen Sie, ob der Server das Internet erreicht (siehe Konfiguration in der Dokumentation).",
+  "Travel times can’t be calculated right now.": "Fahrzeiten können gerade nicht berechnet werden.",
+  "Updated {time}, with a problem: {error}": "Aktualisiert {time}, mit einem Problem: {error}",
 });

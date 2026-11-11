@@ -161,6 +161,7 @@ function publicMedia(m) {
   if (m.file) out.url = mediaUrl(m, m.file);
   if (m.slides) out.slideUrls = m.slides.map((s) => mediaUrl(m, `slides/${s}`));
   out.thumb = m.type === 'image' ? out.url : m.type === 'presentation' && out.slideUrls && out.slideUrls[0] ? out.slideUrls[0] : null;
+  if (m.type === 'weather' || m.type === 'traffic') out.liveStatus = liveStatus.get(m.id) || null;
   return out;
 }
 
@@ -253,7 +254,7 @@ function expandMedia(m, it, defaults) {
   else if (m.type === 'web') out.push({ ...base, type: 'web', url: m.url, duration, zoom: Number(m.zoom) || 100, refreshSeconds: Number(m.refreshSeconds) || 0 });
   else if (m.type === 'text') out.push({ ...base, type: 'text', text: m.text, duration });
   // Weather and traffic slides are pages served by KevCast itself (public/widgets), shown like a web page.
-  else if (m.type === 'weather' || m.type === 'traffic') out.push({ ...base, type: 'web', widget: m.type, url: `/widgets/${m.type}.html?id=${m.id}`, duration, zoom: 100, refreshSeconds: 0 });
+  else if (m.type === 'weather' || m.type === 'traffic') out.push({ ...base, type: 'web', widget: m.type, url: `/widgets/${m.type}.html?id=${m.id}`, duration, zoom: 100, refreshSeconds: 0, ...(LANGS.includes(m.language) ? { lang: m.language } : {}) });
   return out;
 }
 
@@ -592,14 +593,17 @@ admin.post('/media', (req, res) => {
   if (type === 'weather' || type === 'traffic') {
     const place = cleanPlace(req.body.place);
     if (!place) return bad(res, 'Choose a location');
-    const rec = { type, name: name || place.name, place, status: 'ready', tags: [] };
+    const rec = { type, name: name || place.name, place, status: 'ready', tags: [], language: LANGS.includes(req.body.language) ? req.body.language : 'auto' };
     if (type === 'weather') rec.weather = cleanWeatherOptions(req.body.weather);
     if (type === 'traffic') rec.destinations = cleanDestinations(req.body.destinations);
-    return res.json(publicMedia(db.insert('media', rec)));
+    const created = db.insert('media', rec);
+    if (require.main === module) liveData(created, LANGS.includes(created.language) ? created.language : 'en').catch(() => {}); // ready before a screen asks
+    return res.json(publicMedia(created));
   }
   bad(res, 'Unknown media type');
 });
 
+const LANGS = ['en', 'nl', 'de'];
 const cleanZoom = (z) => Math.max(25, Math.min(400, Math.round(Number(z) || 100)));
 // Live data slides ------------------------------------------------------------------
 function cleanPlace(p) {
@@ -625,6 +629,7 @@ admin.patch('/media/:id', (req, res) => {
   }
   if ('destinations' in (req.body || {})) patch.destinations = cleanDestinations(req.body.destinations);
   if ('weather' in (req.body || {})) patch.weather = cleanWeatherOptions(req.body.weather);
+  if ('language' in (req.body || {})) patch.language = LANGS.includes(req.body.language) ? req.body.language : 'auto';
   if ('url' in patch && !/^https?:\/\//i.test(patch.url || '')) return bad(res, 'Enter a full web address starting with http:// or https://');
   if ('zoom' in patch) patch.zoom = cleanZoom(patch.zoom);
   if ('refreshSeconds' in patch) patch.refreshSeconds = Math.max(0, Number(patch.refreshSeconds) || 0);
@@ -854,7 +859,7 @@ admin.post('/displays/command', (req, res) => {
   res.json({ ok: true, targeted: list.length, delivered });
 });
 admin.patch('/displays/bulk', (req, res) => {
-  const allowed = ['groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'clockFormat', 'ticker', 'background', 'maintenance'];
+  const allowed = ['groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'clockFormat', 'language', 'ticker', 'background', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body?.patch || {}).filter(([k]) => allowed.includes(k)));
   if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
   if (patch.groups) patch.groups = ensureGroups(patch.groups);
@@ -876,7 +881,7 @@ admin.get('/displays/:id/screenshot', (req, res) => {
 });
 
 admin.patch('/displays/:id', (req, res) => {
-  const allowed = ['name', 'groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'clockFormat', 'ticker', 'background', 'notes', 'maintenance'];
+  const allowed = ['name', 'groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'clockFormat', 'language', 'ticker', 'background', 'notes', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
   if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
   if (patch.groups) patch.groups = ensureGroups(Array.isArray(patch.groups) ? patch.groups : []);
@@ -1111,19 +1116,48 @@ admin.delete('/users/:id', adminOnly, (req, res) => {
 
 // Data for the weather and traffic slides (public/widgets). Players and previews load it without a login;
 // it only exists for those two media types and contains nothing private.
+// Weather/traffic data, with the outcome remembered per slide (shown in the Web Studio).
+const liveStatus = new Map(); // media id → { ok, at, error }
+async function liveData(m, lang = 'en') {
+  try {
+    const data = m.type === 'weather'
+      ? { name: m.name, options: cleanWeatherOptions(m.weather), ...(await liveWeather.weather(m.place, lang)) }
+      : { name: m.name, ...(await liveTraffic.traffic(m.place, m.destinations)) };
+    const failed = m.type === 'traffic' ? data.routes.filter((r) => r.error) : [];
+    const problem = (failed[0] && failed[0].error) || data.liveError || (data.stale && data.error) || null;
+    liveStatus.set(m.id, { ok: !(failed.length && failed.length === data.routes.length), at: new Date().toISOString(), error: problem });
+    return data;
+  } catch (e) {
+    liveStatus.set(m.id, { ok: false, at: new Date().toISOString(), error: e.message });
+    throw e;
+  }
+}
 app.get('/api/widgets/:id', async (req, res) => {
   const m = db.get('media', req.params.id);
   if (!m || !['weather', 'traffic'].includes(m.type) || !m.place) return bad(res, 'Not found', 404);
   res.setHeader('Cache-Control', 'no-store');
+  const lang = String(req.query.lang || 'en').slice(0, 2);
+  const work = liveData(m, lang);
+  // Never keep a screen waiting long: if the data isn't ready within a few seconds, say so (it keeps loading
+  // in the background) and the slide asks again shortly.
+  const timer = new Promise((resolve) => setTimeout(() => resolve({ loading: true }), 6000));
   try {
-    const lang = String(req.query.lang || 'en').slice(0, 2);
-    if (m.type === 'weather') return res.json({ name: m.name, options: cleanWeatherOptions(m.weather), ...(await liveWeather.weather(m.place, lang)) });
-    return res.json({ name: m.name, ...(await liveTraffic.traffic(m.place, m.destinations)) });
+    const data = await Promise.race([work, timer]);
+    if (data.loading) { work.catch(() => {}); return res.status(202).json({ loading: true }); }
+    res.json(data);
   } catch (e) {
     console.warn(`[live] ${m.type} ${m.name}: ${e.message}`);
-    bad(res, `No ${m.type} data right now (${e.message})`, 502);
+    res.status(502).json({ error: e.message });
   }
 });
+// Keep all weather and traffic slides fresh in the background, so screens get their data instantly.
+function refreshLiveSlides() {
+  for (const m of db.list('media')) {
+    if ((m.type === 'weather' || m.type === 'traffic') && m.place) {
+      liveData(m, LANGS.includes(m.language) ? m.language : 'en').catch((e) => console.warn(`[live] ${m.type} ${m.name}: ${e.message}`));
+    }
+  }
+}
 app.use('/widgets', express.static(path.join(pub, 'widgets'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
 app.use('/api', admin);
@@ -1162,6 +1196,8 @@ function startDiscovery() {
 
 if (require.main === module) {
   startDiscovery();
+  setTimeout(refreshLiveSlides, 5000);
+  setInterval(refreshLiveSlides, 2 * 60 * 1000);
   app.listen(PORT, HOST, () => {
     const caps = convert.capabilities();
     console.log(`\n  KevCast ${pkg.version} is running`);

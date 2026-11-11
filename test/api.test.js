@@ -335,7 +335,14 @@ test('weather and traffic slides', async () => {
   assert.strictEqual((await fetch(`${base}/widgets/weather.html`)).status, 200);
   assert.deepStrictEqual((await call('GET', '/api/geocode?q=a')).body, [], 'too short to search');
   assert.ok((await call('GET', '/api/places/cities?country=nl')).body.some((c) => c.name === 'Amsterdam'));
-  // Clock format per screen.
+  // Clock format and language per screen.
   const d = (await call('GET', '/api/displays')).body[0];
   assert.strictEqual((await call('PATCH', `/api/displays/${d.id}`, { clockFormat: '12' })).body.clockFormat, '12');
+  assert.strictEqual((await call('PATCH', `/api/displays/${d.id}`, { language: 'de' })).body.language, 'de');
+  // A language per slide: sent to the player with the item.
+  assert.strictEqual(w.language, 'auto');
+  assert.strictEqual((await call('PATCH', `/api/media/${w.id}`, { language: 'nl' })).body.language, 'nl');
+  assert.strictEqual((await call('PATCH', `/api/media/${w.id}`, { language: 'xx' })).body.language, 'auto', 'unknown = automatic');
+  await call('PATCH', `/api/media/${w.id}`, { language: 'de' });
+  assert.strictEqual((await call('GET', `/api/playlists/${pl.id}/preview`)).body.items[0].lang, 'de');
 });

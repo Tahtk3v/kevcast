@@ -95,6 +95,7 @@ These are set per screen under **Displays → Settings**, or for many screens at
 | Image fit | `contain` (fit) or `cover` (fill) |
 | Background | colour |
 | Show clock | on/off |
+| Language | automatic (the screen computer's language), English, Dutch or German. For the screen's messages, idle clock and weather and traffic slides. |
 | Clock | automatic (the screen's language), 24-hour or 12-hour. For the idle screen, the clock in the corner and the times on weather and traffic slides. |
 | News ticker | on/off, text (one message per line), speed (slow/normal/fast), colours |
 | Weekly restart | on/off (default on), day of the week (default Sunday), time (default 03:00). Player app only. |

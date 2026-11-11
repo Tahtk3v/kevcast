@@ -724,7 +724,7 @@
     else if (m.type === 'video') preview = h('video', { src: m.url, controls: true, muted: true });
     else if (m.type === 'presentation' && m.slideUrls) preview = h('img', { src: m.slideUrls[0] });
     else if (m.type === 'web') preview = h('iframe', { src: m.url, sandbox: 'allow-scripts allow-same-origin', referrerpolicy: 'no-referrer' });
-    else if (m.type === 'weather' || m.type === 'traffic') preview = h('iframe', { src: `/widgets/${m.type}.html?id=${m.id}&lang=${window.KevI18n.lang}`, sandbox: 'allow-scripts allow-same-origin', class: 'widget-preview' });
+    else if (m.type === 'weather' || m.type === 'traffic') preview = h('iframe', { src: `/widgets/${m.type}.html?id=${m.id}&lang=${m.language && m.language !== 'auto' ? m.language : window.KevI18n.lang}`, sandbox: 'allow-scripts allow-same-origin', class: 'widget-preview' });
     else if (m.type === 'text') preview = textPreview(m.text);
     const big = h('div', { class: 'preview-big' }, preview || (m.status === 'processing' ? h('div', { class: 'spinner' }) : icon('media')));
     const usedIn = state.playlists.filter((p) => p.items.some((i) => i.mediaId === m.id));
@@ -737,6 +737,10 @@
         m.status === 'error' ? h('div', { class: 'alert' }, h('b', {}, t('Conversion failed: ')), t(m.error || '')) : null,
         m.missingFonts?.length && m.status === 'ready' ? h('div', { class: 'alert' }, h('b', {}, t('Missing on the server: {v}. ', { v: m.missingFonts.join(', ') })), t('These slides use a replacement font, so text can look different or be misplaced. '), FONT_HELP) : null,
         m.status === 'ready' ? fontsSection(m, () => closeDialog()) : null,
+        m.liveStatus ? h('div', { class: `alert ${m.liveStatus.ok && !m.liveStatus.error ? 'ok' : ''}`, style: { margin: 0 } },
+          m.liveStatus.ok && !m.liveStatus.error ? t('Data updated {time}.', { time: ago(m.liveStatus.at) })
+            : m.liveStatus.ok ? t('Updated {time}, with a problem: {error}', { time: ago(m.liveStatus.at), error: m.liveStatus.error })
+              : t('The last update failed ({time}): {error}. Check that the server can reach the internet (see Configuration in the docs).', { time: ago(m.liveStatus.at), error: m.liveStatus.error })) : null,
         m.convertedWith === 'PowerPoint' ? h('div', { class: 'muted small' }, icon('presentation'), ' ', m.sourceName
           ? t('Converted to PDF by PowerPoint on the uploader’s computer, from “{file}”.', { file: m.sourceName })
           : t('Converted to PDF by PowerPoint on the uploader’s computer.')) : null,
@@ -830,7 +834,7 @@
   /** Weather and traffic slides: KevCast fetches the data (MET Norway, MeteoAlarm, OSRM, NDW); you pick the place. */
   function liveDialog(type, existing) {
     const s = { name: existing?.name || '', place: existing?.place || null, weather: Object.assign({ hourly: true, days: true, warnings: true }, existing?.weather || {}),
-      destinations: (existing?.destinations || []).slice(), auto: !(existing?.destinations || []).length };
+      destinations: (existing?.destinations || []).slice(), auto: !(existing?.destinations || []).length, language: existing?.language || 'auto' };
     const name = h('input', { value: s.name, placeholder: type === 'weather' ? t('Optional, e.g. Weather in Utrecht') : t('Optional, e.g. Traffic'), oninput: (e) => (s.name = e.target.value) });
     const err = h('div', { class: 'err-text' });
     const destBox = h('div', { class: 'stack', style: { gap: '8px' } });
@@ -854,7 +858,7 @@
       err.textContent = '';
       if (!s.place) { err.textContent = t('Choose a location'); return; }
       if (type === 'traffic' && !s.auto && !s.destinations.length) { err.textContent = t('Choose at least one destination'); return; }
-      const body = { name: s.name.trim() || s.place.name, place: s.place };
+      const body = { name: s.name.trim() || s.place.name, place: s.place, language: s.language };
       if (type === 'weather') body.weather = s.weather;
       if (type === 'traffic') body.destinations = s.auto ? [] : s.destinations;
       try {
@@ -875,10 +879,13 @@
         type === 'weather' ? h('div', { class: 'field' }, h('b', { class: 'small' }, t('Show')), check('hourly', t('Today, hour by hour')), check('days', t('The next 5 days')), check('warnings', t('Weather warnings'))) : null,
         type === 'traffic' ? h('div', { class: 'field' }, h('b', { class: 'small' }, t('Destinations')), destBox) : null,
         h('label', { class: 'field' }, t('Name'), name),
+        h('label', { class: 'field' }, t('Language'), h('span', { class: 'hint' }, t('Automatic uses each screen’s language')),
+          h('select', { onchange: (e) => (s.language = e.target.value) },
+            [['auto', t('Automatic')], ...window.KevI18n.supported.map((c) => [c, window.KevI18n.names[c]])].map(([v, l]) => h('option', { value: v, selected: v === s.language }, l)))),
         h('p', { class: 'muted small', style: { margin: 0 } }, type === 'weather'
           ? t('Data: MET Norway (forecast) and MeteoAlarm (warnings). The KevCast server needs internet access; screens don’t.')
           : t('Data: OpenStreetMap/OSRM (routes) and NDW (traffic jams in the Netherlands). The KevCast server needs internet access; screens don’t.')),
-        existing ? h('a', { class: 'btn sm', href: `/widgets/${type}.html?id=${existing.id}&lang=${window.KevI18n.lang}`, target: '_blank', style: { alignSelf: 'flex-start' } }, icon('play'), t('Preview on a screen')) : null,
+        existing ? h('a', { class: 'btn sm', href: `/widgets/${type}.html?id=${existing.id}&lang=${existing.language && existing.language !== 'auto' ? existing.language : window.KevI18n.lang}`, target: '_blank', style: { alignSelf: 'flex-start' } }, icon('play'), t('Preview on a screen')) : null,
         err,
       ],
       footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, t('Cancel')),
@@ -2081,6 +2088,8 @@
           h('div', { class: 'field' }, h('b', { class: 'small' }, t('Image fit')), segmented([['contain', t('Fit (black bars)')], ['cover', t('Fill (crop)')]], s.fit || 'contain', (v) => (s.fit = v)))),
         h('div', { class: 'field' }, h('b', { class: 'small' }, t('Clock')), h('span', { class: 'hint' }, t('On the idle screen and the clock in the corner')),
           segmented([['auto', t('Automatic')], ['24', t('24-hour (14:30)')], ['12', t('12-hour (2:30 PM)')]], s.clockFormat || 'auto', (v) => (s.clockFormat = v))),
+        h('div', { class: 'field' }, h('b', { class: 'small' }, t('Language')), h('span', { class: 'hint' }, t('Of the screen’s own texts, dates and weather and traffic slides. Automatic follows the computer.')),
+          segmented([['auto', t('Automatic')], ...window.KevI18n.supported.map((c) => [c, window.KevI18n.names[c]])], s.language || 'auto', (v) => (s.language = v))),
         h('div', { class: 'row wrap', style: { gap: '20px' } },
           h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: !!s.showClock, onchange: (e) => (s.showClock = e.target.checked) }), t('Show clock')),
           h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: s.ticker.enabled, onchange: (e) => { s.ticker.enabled = e.target.checked; tickerBox.hidden = !e.target.checked; } }), t('Show news ticker')),
@@ -2097,7 +2106,7 @@
         h('div', { class: 'spacer' }),
         h('button', { class: 'btn', onclick: close }, t('Cancel')),
         h('button', { class: 'btn primary', onclick: async () => {
-          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, groups: s.groups, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, clockFormat: s.clockFormat || 'auto', ticker: s.ticker, background: s.background, notes: s.notes, maintenance: s.maintenance } });
+          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, groups: s.groups, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, clockFormat: s.clockFormat || 'auto', language: s.language || 'auto', ticker: s.ticker, background: s.background, notes: s.notes, maintenance: s.maintenance } });
           close(); toast(t('Saved — the screen updates in a moment'), 'ok'); await loadAll(); renderPage();
         } }, t('Save')),
       ],

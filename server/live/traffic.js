@@ -37,7 +37,7 @@ async function route(from, to) {
     const wait = lastRoute + 1100 - Date.now(); // at most one request per second
     lastRoute = Date.now() + Math.max(0, wait);
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    const j = await getJson(`https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson&steps=true`);
+    const j = await getJson(`https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson&steps=true`, { timeout: 15000 });
     const r = j.routes && j.routes[0];
     if (!r) throw new Error('No route found');
     return {
@@ -131,13 +131,15 @@ async function traffic(origin, destinations) {
   const list = destinations && destinations.length ? destinations : defaultDestinations(origin);
   let live = null;
   let liveError = null;
-  if (origin.country === 'nl') {
-    try { live = await ndwJams(); } catch (e) { liveError = e.message; }
-  }
+  // Traffic jams and routes are fetched at the same time; a jam feed that is down never holds up the routes.
+  const liveP = origin.country === 'nl' ? ndwJams().catch((e) => { liveError = e.message; return null; }) : Promise.resolve(null);
+  const routeP = list.slice(0, 8).map((d) => route(origin, d).then((r) => ({ d, r }), (e) => ({ d, e })));
+  live = await liveP;
   const routes = [];
-  for (const d of list.slice(0, 8)) {
+  for (const p of routeP) {
+    const { d, r, e } = await p;
     try {
-      const r = await route(origin, d);
+      if (e) throw e;
       // Stranded vehicles and the like only count when they cause a delay.
       const jams = live ? jamsOnRoute(r, live.jams).filter((j) => j.kind !== 'obstruction' || j.delay > 0) : [];
       const delay = jams.reduce((s, j) => s + j.delay, 0);

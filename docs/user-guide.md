@@ -84,7 +84,9 @@ warnings elsewhere in Europe. Untick what you don't want to show. Forecast: MET 
 8: tap the cities, or search any other place). In the Netherlands the times include current traffic jams and show
 accidents on the way (live data from NDW). Elsewhere they are normal travel times. Routes: OpenStreetMap/OSRM.
 
-- The slides follow each screen's language, and its **Clock** setting (24-hour or 12-hour) for times.
+- The slides follow each screen's **Language** and **Clock** setting (24-hour or 12-hour). To show one slide in another
+  language, pick it under **Language** in the slide's settings.
+- Click the slide on the Media page to see when its data was last updated, or why it couldn't be updated.
 - The KevCast server needs internet access for these slides; the screens don't. If the internet is gone for a while,
   the slides keep the last data they had. See [Configuration](configuration.md#internet-access-for-weather-and-traffic-slides)
   for the addresses to allow in a firewall.
@@ -394,7 +396,7 @@ KevCast speaks **English, Dutch (Nederlands) and German (Deutsch)**. It follows 
 - **Web Studio and KevCast Studio**: in the computer's language. Under **Settings → Your account → Language** you can
   pick another one for that computer; *Automatic* goes back to the computer's language.
 - **Screens**: the pairing code screen and messages follow the language of the screen's own computer. Dates on the idle
-  clock use it too. Your content itself is never translated.
+  clock and weather and traffic slides use it too. Set **Language** in the screen's settings to choose another one. Your content itself is never translated.
 - **The start page** of the server and the desktop apps' own menus and "connect to server" window follow it as well.
 - Any other language falls back to English.
 

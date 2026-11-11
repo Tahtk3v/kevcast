@@ -76,22 +76,37 @@
   function run(render, everyMs) {
     const key = `kevcast.widget.${id}`;
     const status = document.getElementById('status');
+    const say = (text) => { if (status) { status.textContent = text; status.hidden = false; } };
+    let shown = false;
+    let retry = null;
     async function load() {
+      clearTimeout(retry);
       let data = null;
+      let problem = null;
       try {
         const res = await fetch(`/api/widgets/${encodeURIComponent(id)}?lang=${encodeURIComponent(lang)}`, { cache: 'no-store' });
         const json = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(json.error || res.status);
+        if (res.status === 202) {
+          // The server is still fetching (first time): ask again soon.
+          if (!shown) say(t('Loading…'));
+          retry = setTimeout(load, 4000);
+          return;
+        }
+        if (!res.ok) throw new Error(json.error || String(res.status));
         data = json;
         try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) { /* storage full or blocked */ }
       } catch (e) {
+        problem = e.message;
         try { data = JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) { data = null; }
         if (data) data.stale = true;
-        else if (status) { status.textContent = t('No data yet — the KevCast server needs internet access for this slide.'); status.hidden = false; }
       }
       if (data) {
         if (status) status.hidden = true;
+        shown = true;
         render(data);
+      } else {
+        say(`${t('No data yet — the KevCast server needs internet access for this slide.')}${problem ? `\n\n(${problem})` : ''}`);
+        retry = setTimeout(load, 30000);
       }
     }
     load();

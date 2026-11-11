@@ -134,7 +134,7 @@ An item looks like `{ mediaId, duration, transition?, enabled?, mute? }`:
 |---|---|---|---|
 | GET | `/api/displays` | – | List with `online`, `scheduledPlaylistId`, `scheduleId`, `groupPlaylistId` (playlist named after one of its groups), `effectivePlaylistId` (what plays when nothing is scheduled), `nowPlaying`, `cache`, `screenshotAt` (tokens are never returned) |
 | POST | `/api/displays/pair` | `{ code, name?, groups?: [], defaultPlaylistId? }` | The approved display |
-| PATCH | `/api/displays/:id` | Any of `{ name, groups, defaultPlaylistId, orientation, fit, showClock, ticker, background, notes, maintenance }` | The display |
+| PATCH | `/api/displays/:id` | Any of `{ name, groups, defaultPlaylistId, orientation, fit, showClock, clockFormat, language, ticker, background, notes, maintenance }` | The display |
 | PATCH | `/api/displays/bulk` | `{ ids?: [], group?: "name", all?: true, addGroups?: [], removeGroups?: [], patch: { groups, defaultPlaylistId, orientation, fit, showClock, ticker, background, maintenance } }` | `{ updated }` |
 | POST | `/api/displays/:id/identify` · `/reload` · `/screenshot` | – | `{ delivered }`: 1 if the screen is online |
 | POST | `/api/displays/command` | `{ action: 'identify'\|'reload'\|'screenshot', ids?, group?, all? }` | `{ targeted, delivered }` |

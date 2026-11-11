@@ -749,4 +749,11 @@ KevI18n.add('nl', {
   "{h} h {m} min": "{h} u {m} min",
   "{m} min": "{m} min",
   "Could not search for places: the server can’t reach OpenStreetMap": "Zoeken naar plaatsen lukt niet: de server kan OpenStreetMap niet bereiken",
+  "Automatic uses each screen’s language": "Automatisch gebruikt de taal van elk scherm",
+  "Data updated {time}.": "Gegevens bijgewerkt {time}.",
+  "Of the screen’s own texts, dates and weather and traffic slides. Automatic follows the computer.": "Voor de eigen teksten van het scherm, datums en de weer- en verkeersdia's. Automatisch volgt de computer.",
+  "Route unavailable": "Route niet beschikbaar",
+  "The last update failed ({time}): {error}. Check that the server can reach the internet (see Configuration in the docs).": "De laatste update is mislukt ({time}): {error}. Controleer of de server het internet kan bereiken (zie Configuratie in de documentatie).",
+  "Travel times can’t be calculated right now.": "Reistijden kunnen nu niet worden berekend.",
+  "Updated {time}, with a problem: {error}": "Bijgewerkt {time}, met een probleem: {error}",
 });

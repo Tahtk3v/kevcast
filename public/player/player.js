@@ -180,6 +180,15 @@
 
   function applyDisplaySettings() {
     const d = manifest.display;
+    // Display setting "Language": automatic (the computer's language) or a fixed one. Switching reloads once.
+    if (window.KevI18n && !qs.has('preview')) {
+      const want = ['en', 'nl', 'de'].includes(d.language) ? d.language : 'auto';
+      if (want !== window.KevI18n.choice) {
+        window.KevI18n.set(want); // stored on this screen; after the reload the choice matches, so this runs once
+        location.reload();
+        return;
+      }
+    }
     const root = $('root');
     root.className = d.orientation && d.orientation !== 'landscape' ? d.orientation : '';
     root.style.setProperty('--fit', d.fit || 'contain');
@@ -314,7 +323,7 @@
         Object.assign(frame.style, { width: `${100 / z}%`, height: `${100 / z}%`, transform: `scale(${z})`, transformOrigin: '0 0' });
         // KevCast's own weather/traffic slides get the screen's language and clock setting.
         const url = item.widget
-          ? `${item.url}&lang=${encodeURIComponent((window.KevI18n && window.KevI18n.lang) || 'en')}&clock=${encodeURIComponent(clockFormat())}`
+          ? `${item.url}&lang=${encodeURIComponent(item.lang || (window.KevI18n && window.KevI18n.lang) || 'en')}&clock=${encodeURIComponent(clockFormat())}`
           : item.url;
         frame.src = url;
         el.appendChild(frame);

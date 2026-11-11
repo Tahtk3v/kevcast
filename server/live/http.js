@@ -35,7 +35,9 @@ function cached(ttlMs) {
   const store = new Map();
   return async function (key, load) {
     const hit = store.get(key);
-    if (hit && Date.now() - hit.at < ttlMs) return hit.value;
+    if (hit && hit.failed && Date.now() - hit.failedAt < 60000) throw hit.failed;
+    if (hit && hit.failed) store.delete(key);
+    if (hit && hit.value !== undefined && Date.now() - hit.at < ttlMs) return hit.value;
     if (hit && hit.pending) return hit.pending;
     const pending = load().then((value) => {
       store.set(key, { value, at: Date.now() });
@@ -45,7 +47,8 @@ function cached(ttlMs) {
         store.set(key, { ...hit, pending: null, at: Date.now() - ttlMs + 60000 }); // retry in a minute
         return { ...hit.value, stale: true, error: err.message };
       }
-      store.delete(key);
+      // Remember the failure for a minute, so a source that is down doesn't make every request wait for it.
+      store.set(key, { failed: err, failedAt: Date.now() });
       throw err;
     });
     store.set(key, { ...(hit || {}), pending });

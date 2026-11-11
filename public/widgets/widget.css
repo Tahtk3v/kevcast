@@ -13,7 +13,10 @@ h1 { margin: 0; font-size: 5vmin; font-weight: 800; letter-spacing: -0.02em; }
 .foot { margin-top: auto; display: flex; gap: 2vmin; color: #64748b; font-size: 1.7vmin; }
 .foot .spacer { flex: 1; }
 .stale { color: #fbbf24; }
-#status { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 10vmin; font-size: 3vmin; color: #cbd5e1; }
+#status { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 10vmin; font-size: 3vmin; color: #cbd5e1; white-space: pre-line; }
+#status[hidden] { display: none; }
+.route.failed { border-left-color: #64748b; } .route.failed .time { font-size: 2.6vmin; color: #94a3b8; font-weight: 600; }
+.notice { background: rgba(255,255,255,.08); border-radius: 2vmin; padding: 3vmin; font-size: 2.6vmin; color: #cbd5e1; }
 
 /* Weather */
 .now { display: flex; align-items: center; gap: 3vmin; }
