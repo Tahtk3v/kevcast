@@ -1,7 +1,7 @@
 {
   "name": "kevcast-desktop",
   "productName": "KevCast",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "KevCast Player (signage app for screens) and KevCast Studio (management app).",
   "author": {
     "name": "Kevin B",

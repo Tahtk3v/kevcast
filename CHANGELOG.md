@@ -4,6 +4,8 @@ All notable changes to KevCast are listed here. The format follows [Keep a Chang
 and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.8.0] - 2026-11-11
 ### Added
 - **Editors for some playlists only.** Under *Settings → Users → Edit → Playlists* an administrator can limit an editor
   to some playlists. That editor sees and changes only those playlists and their schedule entries, and sees only the
