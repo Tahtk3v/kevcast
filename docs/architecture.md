@@ -59,6 +59,10 @@ Files are immutable (a new upload gets a new id), so they can be cached forever.
 3. `pdftoppm -jpeg -scale-to 1920` renders each page, or Ghostscript at 150 dpi if Poppler is missing.
 4. → `status: 'ready'` with `slides: [...]`. The admin is notified live and the slides appear.
 
+Before step 2, `server/pptx.js` prepares a temporary copy of a `.pptx` when needed: it drops fonts embedded in the
+file that the server has installed (LibreOffice often draws embedded subset fonts wrongly), and applies **Arial for all
+text** or the server-wide font replacements. The upload itself is never changed.
+
 PDFs skip step 2. Failures store a readable `error` on the media item, shown in the admin with a **Re-convert** button.
 
 ## Scheduling
@@ -125,7 +129,7 @@ A client sends the UDP datagram `KEVCAST_DISCOVER` to port 41234 on:
 
 Each server replies to the sender with JSON:
 ```json
-{ "kevcast": true, "id": "server-instance-id", "name": "Acme HQ", "version": "0.4.0", "port": 8080, "urls": ["http://192.168.1.20:8080"] }
+{ "kevcast": true, "id": "server-instance-id", "name": "Acme HQ", "version": "0.5.0", "port": 8080, "urls": ["http://192.168.1.20:8080"] }
 ```
 The client uses the address the reply came from, de-duplicates by `id`, and prefers a LAN address over loopback.
 

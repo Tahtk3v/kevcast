@@ -30,9 +30,16 @@ another one, which makes text wider or narrower, so it wraps differently and box
   A plain *Install* puts the font in your own account only, and the KevCast service (which runs as SYSTEM) can't see it.
   On Linux, copy the font to `/usr/local/share/fonts` and run `sudo fc-cache -f`.
 - Then click **Re-convert these** on the Media page, **Re-convert** on one item, or **Settings → Server → Re-convert all**.
-- **Garbled letters** (pieces of letters cut off or overlapping) on a Windows server with KevCast 0.3.0 or earlier: the
-  bundled slide renderer couldn't find fonts that weren't embedded in the PDF. Fixed in 0.4.0: update the server, then
-  re-convert.
+- **Garbled letters** (pieces of letters cut off or overlapping), even with the font installed: LibreOffice can't draw
+  that font properly. This happens with some fonts, and with fonts PowerPoint embedded in the file (KevCast 0.5.0 and
+  later ignore embedded copies of fonts the server has installed). Fix it in the Web Studio, without changing the file:
+  - Open the presentation in **Media** and choose **Fonts → Arial for all text**. KevCast converts it again with Arial,
+    which every computer has.
+  - Or click **Replace with Arial** next to the one font that goes wrong. That applies to every presentation using it.
+    Manage the list under **Settings → Server → Font replacements**; you can pick another font than Arial there.
+  - On the Media page, **Use Arial for these** does it for all presentations with missing fonts at once.
+  - With KevCast 0.3.0 or earlier on Windows, the bundled slide renderer also couldn't find fonts that weren't embedded
+    in the PDF. Update the server (0.4.0 and later) and re-convert.
 - For a pixel-perfect result, export the presentation to **PDF** in PowerPoint (*File → Export → PDF*) and upload the PDF:
   PowerPoint then embeds its own fonts and layout.
 - On Linux the installer adds Carlito and Caladea, which have the same metrics as Calibri and Cambria.

@@ -34,6 +34,7 @@ curl -b kc.txt http://server:8080/api/displays
 | PATCH | `/api/settings` | `{ orgName }` | `{ ok }` (*admin*) |
 | POST | `/api/password` | `{ current, next }` | `{ ok }`. Changes your own password and ends your other sessions. |
 | POST | `/api/provisioning-key/rotate` | – | `{ provisioningKey }` (*admin*) |
+| PUT | `/api/font-replacements` | `[{ from, to? }]` | Replaces the server-wide font replacements for PowerPoint conversion (`to` defaults to Arial); presentations using a changed font are converted again: `{ replacements, reconverting }` (*admin*). The current list is in `/api/overview` as `fontReplacements`. |
 | GET | `/api/backup` | – | Database export without users or credentials (download) (*admin*) |
 | GET | `/api/events` | – | Server-Sent Events: `change`, `media`, `heartbeat`, `pairing` |
 
@@ -53,10 +54,10 @@ curl -b kc.txt http://server:8080/api/displays
 | GET | `/api/media` | – | List. Each item adds `url`, `slideUrls`, `thumb`. |
 | POST | `/api/media/upload` | `multipart/form-data`, field `files` (up to 50 files) | `{ created: [...], rejected: [names] }` |
 | POST | `/api/media` | `{ type: 'web', url, name?, zoom?, refreshSeconds? }` or `{ type: 'text', text: { title, body, bg, bg2, fg, align, size }, name? }` | The media item |
-| PATCH | `/api/media/:id` | `{ name?, url?, text?, tags?, zoom?, refreshSeconds? }` | The media item |
+| PATCH | `/api/media/:id` | `{ name?, url?, text?, tags?, zoom?, refreshSeconds?, fontMode? }` | The media item. `fontMode` (PowerPoint): `auto` (as in the file) or `arial` (Arial for all text); changing it converts the file again. Presentations also report `fontsUsed`, `missingFonts`, `embeddedFonts` and `replacedFonts`. |
 | GET | `/api/media/:id/preview` | – | The item as players receive it (used by `/player/?preview=media:<id>`) |
 | POST | `/api/media/:id/reconvert` | – | Converts a presentation again |
-| POST | `/api/media/reconvert-all` | `{ onlyMissingFonts? }` | Converts every presentation again (or only those with missing fonts): `{ count }` |
+| POST | `/api/media/reconvert-all` | `{ onlyMissingFonts?, fontMode? }` | Converts every presentation again (or only those with missing fonts), optionally setting their `fontMode`: `{ count }` |
 | DELETE | `/api/media/:id` | – | Also removes it from all playlists and deletes schedule entries that play it |
 
 Presentations start with `status: "processing"` and become `"ready"` or `"error"` (with `error`).
