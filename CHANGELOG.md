@@ -5,7 +5,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 ### Added
-- **Content that starts or expires, set in the playlist editor.** Click the date chip under an item (*Always*) to set
+- **Content that starts or expires, set in the playlist editor.** Click an item (or the date chip under it) to set
   *Show from* and/or *Show until*, with quick choices (tonight, in a week, end of the month). Screens skip the item
   outside that period, also offline. Expired items are marked and **Remove N expired items** cleans them up.
 - **Delete permanently from the playlist editor**: 🗑 on a playlist item deletes the file from Media, every playlist and

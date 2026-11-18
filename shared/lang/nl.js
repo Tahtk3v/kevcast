@@ -788,4 +788,5 @@ KevI18n.add('nl', {
   "Remove {n} expired item": "{n} verlopen item weghalen",
   "Remove {n} expired items": "{n} verlopen items weghalen",
   "Nothing in this playlist is shown right now: its items start later.": "Er wordt nu niets uit deze afspeellijst getoond: de items beginnen later.",
+  "Click to choose when to show it; drag to reorder": "Klik om te kiezen wanneer het getoond wordt; sleep om de volgorde te wijzigen",
 });

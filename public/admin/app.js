@@ -1109,6 +1109,12 @@
               await savePlaylist(p, true);
               await deleteMedia([m]);
             } }, icon('trash')) : null));
+        // Clicking the item itself (picture or name) asks when to show it; controls keep their own job.
+        row.title = t('Click to choose when to show it; drag to reorder');
+        row.addEventListener('click', (e) => {
+          if (e.target.closest('.controls, .handle, .when-chip, input, button, a')) return;
+          timingDialog(it, m, () => { savePlaylist(p, true); draw(); });
+        });
         row.addEventListener('dragstart', (e) => { dragFrom = idx; state.busy = true; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/kevcast-item', String(idx)); });
         row.addEventListener('dragend', () => { state.busy = false; dragFrom = null; draw(); });
         row.addEventListener('dragover', (e) => {

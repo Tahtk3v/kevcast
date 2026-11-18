@@ -788,4 +788,5 @@ KevI18n.add('de', {
   "Remove {n} expired item": "{n} abgelaufenes Element entfernen",
   "Remove {n} expired items": "{n} abgelaufene Elemente entfernen",
   "Nothing in this playlist is shown right now: its items start later.": "Aus dieser Playlist wird gerade nichts gezeigt: die Elemente beginnen später.",
+  "Click to choose when to show it; drag to reorder": "Klicken, um zu wählen, wann es gezeigt wird; ziehen, um die Reihenfolge zu ändern",
 });

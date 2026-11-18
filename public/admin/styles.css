@@ -383,4 +383,6 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .when-chip.until { border-style: solid; border-color: var(--warn); color: var(--warn); }
 .when-chip.later { border-style: solid; border-color: var(--accent); color: var(--accent); }
 .when-chip.expired { border-style: solid; border-color: var(--danger); color: var(--danger); }
+.pl-item { cursor: pointer; }
+.pl-item:hover { background: var(--accent-2); }
 .pl-item.expired .thumb, .pl-item.expired .handle { opacity: .45; }

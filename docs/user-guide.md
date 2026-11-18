@@ -135,7 +135,7 @@ The page has three columns: your playlists, the editor and the media library.
 | Reorder | Drag an item by its handle ⋮⋮ |
 | Duration | Seconds per item. For PowerPoint it's **seconds per slide**. Empty = playlist default. For videos, empty = play to the end. |
 | Skip temporarily | Untick the checkbox; the item stays in the list |
-| Show for a period / let it expire | Click the date chip under the item's name (*Always*), set **Show from** and/or **Show until**, or pick *Tonight*, *In a week*, *End of the month*. See below. |
+| Show for a period / let it expire | Click the item, or the date chip under its name (*Always*), set **Show from** and/or **Show until**, or pick *Tonight*, *In a week*, *End of the month*. See below. |
 | Remove from the playlist | Click **−** on the row. The file stays in Media. **Undo** in the message puts it back. |
 | Delete permanently | Click 🗑 on the row, or on the item in the library on the right. After confirming, it is removed from Media, every playlist and all screens. |
 | Rename / colour | Edit the name at the top. The colour is used in the schedule calendar. |
@@ -148,7 +148,7 @@ Changes save automatically. *All changes saved* appears at the top. The total ru
 ### Content that starts or expires
 
 Each item in a playlist can have its own period, for example an announcement that runs until Friday evening, or a
-Christmas slide that starts on 1 December. Click the chip under the item's name:
+Christmas slide that starts on 1 December. Click the item (its picture or name) or the chip under its name:
 
 - **Show from**: the screens start showing it at that moment. Empty: right away.
 - **Show until**: after that moment the screens skip it: the item has expired. Empty: no end.
