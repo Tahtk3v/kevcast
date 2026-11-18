@@ -27,6 +27,7 @@
   }
 
   const ICONS = {
+    remove: '<path d="M19 13H5v-2h14z"/>',
     dashboard: '<path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8V11h-8zm0-18v6h8V3z"/>',
     media: '<path d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5z"/>',
     playlist: '<path d="M3 6h12v2H3zm0 4h12v2H3zm0 4h8v2H3zm14-4v8.18A3 3 0 1 0 19 21V12h3v-2z"/>',
@@ -323,11 +324,52 @@
     return tx;
   }
 
+  // A playlist item can be shown only in a period: from (start) and/or until (it expires).
+  const fmtWhen = (iso) => new Date(iso).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  /** 'always' | 'later' (starts in the future) | 'until' (showing, ends later) | 'expired', with a short label. */
+  function timingOf(it, now = Date.now()) {
+    const from = it.from ? Date.parse(it.from) : null;
+    const until = it.until ? Date.parse(it.until) : null;
+    if (until !== null && until <= now) return { state: 'expired', label: t('Expired {v}', { v: fmtWhen(it.until) }) };
+    if (from !== null && from > now) return { state: 'later', label: until !== null ? t('{from} – {until}', { from: fmtWhen(it.from), until: fmtWhen(it.until) }) : t('From {v}', { v: fmtWhen(it.from) }) };
+    if (until !== null) return { state: 'until', label: t('Until {v}', { v: fmtWhen(it.until) }) };
+    return { state: 'always', label: t('Always') };
+  }
+  /** "2026-11-18T14:30" for a datetime-local input. */
+  const toLocalInput = (iso) => { if (!iso) return ''; const d = new Date(iso); return `${dkey(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  /** When a playlist item is shown: from / until (expires), with quick choices. */
+  function timingDialog(it, m, onSave) {
+    const from = h('input', { type: 'datetime-local', value: toLocalInput(it.from) });
+    const until = h('input', { type: 'datetime-local', value: toLocalInput(it.until) });
+    const endOf = (d) => { d.setHours(23, 59, 0, 0); return d; };
+    const quick = (label, make) => h('button', { type: 'button', class: 'btn sm', onclick: () => { until.value = make ? toLocalInput(make().toISOString()) : ''; } }, label);
+    const inDays = (n) => () => { const d = new Date(); d.setDate(d.getDate() + n); return endOf(d); };
+    modal({
+      title: t('When to show “{name}”', { name: m ? m.name : t('this item') }),
+      body: h('div', { class: 'stack' },
+        h('p', { class: 'muted small', style: { margin: 0 } }, t('Outside this period the screens skip the item, also when they are offline. Leave a field empty for no limit. The file stays in Media.')),
+        h('div', { class: 'grid2' },
+          h('label', { class: 'field' }, t('Show from'), h('span', { class: 'hint' }, t('Empty: right away')), from),
+          h('label', { class: 'field' }, t('Show until'), h('span', { class: 'hint' }, t('Empty: no end')), until)),
+        h('div', { class: 'row wrap', style: { gap: '6px' } }, h('span', { class: 'muted small' }, t('Ends:')),
+          quick(t('Tonight'), inDays(0)), quick(t('Tomorrow night'), inDays(1)), quick(t('In a week'), inDays(7)),
+          quick(t('End of the month'), () => { const d = new Date(); return endOf(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }), quick(t('No end'), null))),
+      footer: (close) => [h('div', { class: 'spacer' }), h('button', { class: 'btn', onclick: close }, t('Cancel')),
+        h('button', { class: 'btn primary', onclick: () => {
+          const f = from.value ? new Date(from.value).toISOString() : undefined;
+          const u = until.value ? new Date(until.value).toISOString() : undefined;
+          if (f && u && u <= f) return toast(t('The end is before the start'), 'err');
+          it.from = f; it.until = u;
+          close(); onSave();
+        } }, t('Save'))],
+    });
+  }
+
   function playlistRuntime(p) {
     let secs = 0;
     let unknown = false;
     for (const it of p.items || []) {
-      if (it.enabled === false) continue;
+      if (it.enabled === false || timingOf(it).state === 'expired') continue;
       const m = byId(state.media, it.mediaId);
       if (!m) continue;
       const d = Number(it.duration) || (m.type === 'video' ? 0 : p.defaultDuration || 10);
@@ -1004,7 +1046,15 @@
   function playlistEditor(p) {
     const items = h('div', { class: 'pl-items' });
     const runtime = h('span', { class: 'muted small' });
-    const drawRuntime = () => { runtime.textContent = t('{n} items · total {v}', { n: p.items.length, v: playlistRuntime(p) }); };
+    const expiredBtn = h('button', { class: 'btn sm', hidden: true, title: t('Remove the items whose end date has passed (the files stay in Media)'), onclick: () => {
+      p.items = p.items.filter((it) => timingOf(it).state !== 'expired'); savePlaylist(p, true); draw();
+    } });
+    const drawRuntime = () => {
+      runtime.textContent = t('{n} items · total {v}', { n: p.items.length, v: playlistRuntime(p) });
+      const n = p.items.filter((it) => timingOf(it).state === 'expired').length;
+      expiredBtn.hidden = !n;
+      expiredBtn.textContent = tn(n, 'Remove {n} expired item', 'Remove {n} expired items');
+    };
 
     const groupNote = h('div', { class: 'group-note small' });
     const drawGroupNote = () => {
@@ -1038,12 +1088,15 @@
         const m = byId(state.media, it.mediaId);
         const dur = h('input', { type: 'number', min: 0, value: it.duration || '', placeholder: m?.type === 'video' ? 'auto' : String(p.defaultDuration || 10), title: m?.type === 'presentation' ? t('Seconds per slide') : t('Seconds on screen'),
           oninput: () => { it.duration = Number(dur.value) || 0; savePlaylist(p); drawRuntime(); } });
-        const row = h('div', { class: `pl-item ${it.enabled === false ? 'disabled' : ''}`, draggable: true },
+        const timing = timingOf(it);
+        const row = h('div', { class: `pl-item ${it.enabled === false ? 'disabled' : ''} ${timing.state === 'expired' ? 'expired' : ''}`, draggable: true },
           h('div', { class: 'handle', title: t('Drag to reorder') }, icon('drag')),
           mediaThumb(m, true),
           h('div', { style: { minWidth: 0 } },
             h('div', { style: { fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, m ? m.name : t('(deleted)')),
-            h('div', { class: 'muted small' }, m ? `${TYPE_LABEL[m.type]}${m.slides ? t(' · {n} slides', { n: m.slides.length }) : ''}${m.status === 'processing' ? t(' · converting…') : ''}` : '')),
+            h('div', { class: 'muted small' }, m ? `${TYPE_LABEL[m.type]}${m.slides ? t(' · {n} slides', { n: m.slides.length }) : ''}${m.status === 'processing' ? t(' · converting…') : ''}` : ''),
+            h('button', { class: `when-chip ${timing.state}`, title: t('When to show this item (set an end date to let it expire)'),
+              onclick: () => timingDialog(it, m, () => { savePlaylist(p, true); draw(); }) }, icon('schedule'), timing.label)),
           h('div', { class: 'controls' },
             h('label', { class: 'row small muted', title: m?.type === 'presentation' ? t('Seconds per slide') : t('Seconds on screen') }, dur, m?.type === 'presentation' ? t('s/slide') : 's'),
             h('label', { class: 'check small', title: t('Show this item') }, h('input', { type: 'checkbox', checked: it.enabled !== false, onchange: (e) => { it.enabled = e.target.checked; row.classList.toggle('disabled', !it.enabled); savePlaylist(p); drawRuntime(); } })),
@@ -1051,7 +1104,11 @@
               const [gone] = p.items.splice(idx, 1); savePlaylist(p, true); draw();
               toast(h('span', {}, t('Removed “{v}” from the playlist. ', { v: m ? m.name : 'item' }),
                 h('a', { href: '#', onclick: (e) => { e.preventDefault(); p.items.splice(idx, 0, gone); savePlaylist(p, true); draw(); e.target.closest('.toast')?.remove(); } }, t('Undo'))));
-            } }, icon('trash'))));
+            } }, icon('remove')),
+            m ? h('button', { class: 'btn icon ghost row-del danger-del', title: t('Delete permanently: from Media, every playlist and all screens'), onclick: async () => {
+              await savePlaylist(p, true);
+              await deleteMedia([m]);
+            } }, icon('trash')) : null));
         row.addEventListener('dragstart', (e) => { dragFrom = idx; state.busy = true; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/kevcast-item', String(idx)); });
         row.addEventListener('dragend', () => { state.busy = false; dragFrom = null; draw(); });
         row.addEventListener('dragover', (e) => {
@@ -1092,7 +1149,7 @@
       h('div', { class: 'row wrap', style: { padding: '10px 16px', borderBottom: '1px solid var(--line)', gap: '16px' } },
         h('label', { class: 'row small' }, t('Default time'), defDur, t('sec')),
         h('label', { class: 'row small' }, t('Transition'), trans),
-        h('div', { class: 'spacer' }), runtime),
+        h('div', { class: 'spacer' }), expiredBtn, runtime),
       groupNote,
       items);
   }

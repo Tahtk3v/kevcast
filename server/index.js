@@ -245,7 +245,9 @@ function processPresentation(m) {
 function expandMedia(m, it, defaults) {
   const out = [];
   if (!m || m.status !== 'ready') return out;
-  const base = { itemId: it.id || m.id, mediaId: m.id, name: m.name, transition: it.transition || defaults.transition || 'fade' };
+  const base = { itemId: it.id || m.id, mediaId: m.id, name: m.name, transition: it.transition || defaults.transition || 'fade',
+    // Only shown in this period (set per playlist item); players check it themselves, also offline.
+    ...(it.from ? { from: it.from } : {}), ...(it.until ? { until: it.until } : {}) };
   const duration = Number(it.duration) > 0 ? Number(it.duration) : m.type === 'video' ? 0 : Number(defaults.duration) || 10;
   if (m.type === 'presentation') {
     (m.slides || []).forEach((s, i) => out.push({ ...base, type: 'image', url: mediaUrl(m, `slides/${s}`), duration, slide: i + 1, slides: m.slides.length }));
@@ -263,7 +265,7 @@ function expandPlaylist(p) {
   if (!p) return null;
   const items = [];
   for (const it of p.items || []) {
-    if (it.enabled === false) continue;
+    if (it.enabled === false || (it.until && Date.parse(it.until) <= Date.now())) continue; // expired
     items.push(...expandMedia(db.get('media', it.mediaId), it, { transition: p.transition, duration: p.defaultDuration }));
   }
   return { id: p.id, name: p.name, items };
@@ -779,7 +781,14 @@ function cleanItems(items) {
       transition: ['fade', 'slide', 'none', 'zoom'].includes(i.transition) ? i.transition : undefined,
       enabled: i.enabled !== false,
       mute: i.mute !== false,
+      from: cleanWhen(i.from),
+      until: cleanWhen(i.until),
     }));
+}
+/** A moment as an ISO string, or undefined for "no limit". */
+function cleanWhen(v) {
+  const ms = v ? Date.parse(v) : NaN;
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : undefined;
 }
 
 admin.get('/playlists', (req, res) => {

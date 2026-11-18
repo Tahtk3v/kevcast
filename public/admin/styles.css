@@ -340,7 +340,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .media-card:hover .card-check, .media-card:hover .card-del, .media-card:focus-within .card-check, .media-card:focus-within .card-del,
 .media-grid.selecting .card-check { opacity: 1; }
 .media-grid.selecting .card-del { display: none; }
-.row-del { opacity: 0; transition: opacity .12s; }
+/* Delete/remove buttons are faint until hovered, so they can be found without cluttering the list. */
+.row-del { opacity: .35; transition: opacity .12s; }
+.pl-list a .row-del { opacity: 0; }
 .lib-item:hover .row-del, .pl-item:hover .row-del, .pl-list a:hover .row-del, .row-del:focus-visible { opacity: 1; }
 .row-del:hover { color: #fff; background: var(--danger); border-color: var(--danger); }
 .pl-list a { position: relative; }
@@ -373,3 +375,12 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .alert.ok { background: rgba(22,163,74,.08); border-color: rgba(22,163,74,.3); }
 .pick-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 14px; max-height: 220px; overflow: auto; }
 .pick-list .check { align-items: center; gap: 8px; }
+
+/* When a playlist item is shown: a chip under its name. */
+.when-chip { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 2px 8px; border-radius: 999px; border: 1px dashed var(--line); background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
+.when-chip svg { width: 13px; height: 13px; }
+.when-chip:hover { border-color: var(--accent); color: var(--accent); }
+.when-chip.until { border-style: solid; border-color: var(--warn); color: var(--warn); }
+.when-chip.later { border-style: solid; border-color: var(--accent); color: var(--accent); }
+.when-chip.expired { border-style: solid; border-color: var(--danger); color: var(--danger); }
+.pl-item.expired .thumb, .pl-item.expired .handle { opacity: .45; }

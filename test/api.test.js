@@ -424,3 +424,23 @@ test('editors limited to some playlists', async () => {
   await call('DELETE', `/api/playlists/${pb.id}`);
   assert.deepStrictEqual((await call('GET', '/api/users')).body.find((u) => u.username === 'carla').playlists, [pa.id]);
 });
+
+test('playlist items with a period (show from / until)', async () => {
+  await call('POST', '/api/login', { username: 'sam', password: 'newpass1' });
+  const m = (await call('POST', '/api/media', { type: 'text', text: { title: 'Timed' } })).body;
+  const p = (await call('POST', '/api/playlists', { name: 'Timed' })).body;
+  const hour = 3600e3;
+  const iso = (ms) => new Date(Date.now() + ms).toISOString();
+  const saved = (await call('PUT', `/api/playlists/${p.id}`, { items: [
+    { mediaId: m.id, until: iso(hour) },
+    { mediaId: m.id, from: iso(hour), until: 'not a date' },
+    { mediaId: m.id, until: iso(-hour) },
+  ] })).body;
+  assert.ok(saved.items[0].until && !saved.items[0].from);
+  assert.strictEqual(saved.items[1].until, undefined, 'invalid dates mean no limit');
+  // Screens get the period with each item (they check it themselves); expired items are left out.
+  const items = (await call('GET', `/api/playlists/${p.id}/preview`)).body.items;
+  assert.strictEqual(items.length, 2);
+  assert.strictEqual(items[0].until, saved.items[0].until);
+  assert.strictEqual(items[1].from, saved.items[1].from);
+});

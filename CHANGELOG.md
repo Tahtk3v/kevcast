@@ -4,6 +4,15 @@ All notable changes to KevCast are listed here. The format follows [Keep a Chang
 and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+- **Content that starts or expires, set in the playlist editor.** Click the date chip under an item (*Always*) to set
+  *Show from* and/or *Show until*, with quick choices (tonight, in a week, end of the month). Screens skip the item
+  outside that period, also offline. Expired items are marked and **Remove N expired items** cleans them up.
+- **Delete permanently from the playlist editor**: 🗑 on a playlist item deletes the file from Media, every playlist and
+  all screens (after confirming); **−** only removes it from the playlist.
+### Changed
+- Remove and delete buttons in lists are faintly visible instead of only on hover, so they are easier to find.
+- Electron 45.3.1 for KevCast Player and Studio (no longer trusts eMudhra's revoked certificates).
 
 ## [0.8.0] - 2026-11-11
 ### Added

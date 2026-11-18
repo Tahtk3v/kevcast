@@ -78,6 +78,8 @@ curl -b kc.txt -F files=@"Weekly update.pptx" http://server:8080/api/media/uploa
 | GET | `/api/playlists` | – | List |
 | POST | `/api/playlists` | `{ name?, items? }` | The playlist (a colour is assigned) |
 | PUT | `/api/playlists/:id` | Any of `{ name, color, defaultDuration, transition, items }` | The playlist |
+
+A playlist item is `{ mediaId, duration?, enabled?, mute?, from?, until? }`. `from` and `until` are ISO dates: the item only plays in that period (players check it themselves). Expired items are left out of the player manifest.
 | POST | `/api/playlists/:id/duplicate` | – | The copy |
 | DELETE | `/api/playlists/:id` | – | Also deletes its schedule entries and clears it as a default |
 | GET | `/api/playlists/:id/preview` | – | The flattened playlist exactly as players receive it |
