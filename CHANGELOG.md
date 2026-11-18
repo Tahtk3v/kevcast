@@ -4,6 +4,8 @@ All notable changes to KevCast are listed here. The format follows [Keep a Chang
 and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.9.0] - 2026-11-18
 ### Added
 - **Content that starts or expires, set in the playlist editor.** Click an item (or the date chip under it) to set
   *Show from* and/or *Show until*, with quick choices (tonight, in a week, end of the month). Screens skip the item
