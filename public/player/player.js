@@ -226,12 +226,14 @@
   // Positions are remembered per slot, so a playlist resumes where it was after an interrupt
   // (e.g. traffic info shown for one minute every 15 minutes).
   const positions = {};
+  /** Playlist items can have a period ("show from … until …"); outside it they are skipped. */
+  const live = (item, now = Date.now()) => !!item && (!item.from || Date.parse(item.from) <= now) && (!item.until || Date.parse(item.until) > now);
 
   function evaluate(force) {
     if (!manifest || !manifest.display.approved) return;
     const r = KevSchedule.resolve(manifest.schedules, manifest.display, new Date());
     const pl = r.key && manifest.playlists[r.key];
-    if (!pl || !pl.items.length) {
+    if (!pl || !pl.items.some((i) => live(i))) {
       if (current.slot) positions[current.slot] = current.index;
       current = { slot: null, key: null, index: -1, item: null, itemDuration: 0 };
       clearTimeout(timer);
@@ -262,12 +264,15 @@
     clearTimeout(timer);
     const pl = playlist();
     if (!pl || !pl.items.length) return evaluate();
-    current.index = (current.index + 1) % pl.items.length;
+    // The next item that is in its period (skip ones that haven't started or have ended).
+    let tries = pl.items.length;
+    do { current.index = (current.index + 1) % pl.items.length; } while (!live(pl.items[current.index]) && --tries > 0);
+    if (!live(pl.items[current.index])) return evaluate();
     const item = pl.items[current.index];
     const prev = current.item;
     current.item = item;
     // One item that is already on screen (e.g. a single web page): keep it instead of reloading it.
-    if (pl.items.length === 1 && prev && prev.itemId === item.itemId && prev.url === item.url && item.type !== 'video' && activeLayer.firstChild) {
+    if (pl.items.filter((i) => live(i)).length === 1 && prev && prev.itemId === item.itemId && prev.url === item.url && item.type !== 'video' && activeLayer.firstChild) {
       const d = current.itemDuration > 0 ? current.itemDuration : item.duration;
       timer = setTimeout(next, Math.max(2, d || 10) * 1000);
       return;
@@ -431,6 +436,7 @@
       applyDisplaySettings();
       evaluate(true);
       if (!pl.items.length) $('idleHint').textContent = tr('This playlist is empty (or its files are still processing).');
+      else if (!pl.items.some((i) => live(i))) $('idleHint').textContent = tr('Nothing in this playlist is shown right now: its items start later.');
     } catch (e) {
       setStatus(tr('Preview failed — are you logged in to the admin?'));
     }

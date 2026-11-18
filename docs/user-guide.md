@@ -135,14 +135,28 @@ The page has three columns: your playlists, the editor and the media library.
 | Reorder | Drag an item by its handle ⋮⋮ |
 | Duration | Seconds per item. For PowerPoint it's **seconds per slide**. Empty = playlist default. For videos, empty = play to the end. |
 | Skip temporarily | Untick the checkbox; the item stays in the list |
-| Remove | Hover over the row and click 🗑. The file stays in Media. **Undo** in the message puts it back. |
-| Delete media from the library | Hover over it in the library on the right and click 🗑 |
+| Show for a period / let it expire | Click the item, or the date chip under its name (*Always*), set **Show from** and/or **Show until**, or pick *Tonight*, *In a week*, *End of the month*. See below. |
+| Remove from the playlist | Click **−** on the row. The file stays in Media. **Undo** in the message puts it back. |
+| Delete permanently | Click 🗑 on the row, or on the item in the library on the right. After confirming, it is removed from Media, every playlist and all screens. |
 | Rename / colour | Edit the name at the top. The colour is used in the schedule calendar. |
 | Default time and transition | Fade, Slide, Zoom or None for the whole playlist |
 | Preview | Opens exactly what a screen will show, in a new window |
 | Duplicate / delete | Icons next to the name, or hover over a playlist in the left column and click 🗑 |
 
 Changes save automatically. *All changes saved* appears at the top. The total running time is shown above the list.
+
+### Content that starts or expires
+
+Each item in a playlist can have its own period, for example an announcement that runs until Friday evening, or a
+Christmas slide that starts on 1 December. Click the item (its picture or name) or the chip under its name:
+
+- **Show from**: the screens start showing it at that moment. Empty: right away.
+- **Show until**: after that moment the screens skip it: the item has expired. Empty: no end.
+
+The chip shows the state: *Always*, *From …* (blue, starts later), *Until …* (orange) or *Expired …* (red). Expired
+items stay in the list, greyed out, so you can give them a new date. **Remove N expired items** above the list cleans
+them up. The screens check the period themselves, so it also works while they are offline. The file stays in Media;
+the period belongs to that playlist only, so the same file can run for a different period in another playlist.
 
 ### A playlist for each group
 
