@@ -103,4 +103,4 @@ These are set per screen under **Displays → Settings**, or for many screens at
 | Show clock | on/off |
 | Language | automatic (the screen computer's language), English, Dutch or German. For the screen's messages, idle clock and weather and traffic slides. |
 | News ticker | on/off, text (one message per line), speed (slow/normal/fast), colours |
-| Weekly restart | on/off (default on), day of the week (default Sunday), time (default 03:00). Player app only. |
+| Weekly restart | *Like all screens* (the server-wide setting under **Settings → General**: on, Sunday 03:00 by default) or the screen's own: on/off, day, time. Player app only. |

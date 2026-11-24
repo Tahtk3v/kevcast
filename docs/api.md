@@ -176,7 +176,7 @@ A display can be in several groups: `display.groups` is an array of names. Sched
 | POST | `/api/player/screenshot` | JPEG bytes, `Content-Type: image/jpeg`, max 5 MB | `{ ok }` |
 | GET | `/api/player/events` | – | SSE: `update`, `approved`, `identify`, `reload`, `screenshot`, `unpaired` |
 
-`maintenance` is `{ weeklyRestart: true, day: 0, time: "03:00" }` (day 0 = Sunday): the weekly restart of Player app screens.
+`maintenance` is `{ weeklyRestart: true, day: 0, time: "03:00", custom: false }` (day 0 = Sunday): the weekly restart of Player app screens. `custom: false` means the screen follows the server-wide setting (`PATCH /api/settings { maintenance }`); `PATCH /api/displays/:id { maintenance: {...} }` gives a screen its own, and `{ maintenance: null }` makes it follow the server again. `PATCH /api/settings { restartForAll: true }` puts every screen back on the server setting.
 
 Manifest playlists are flattened. Single scheduled items appear as playlists with the key `media:<id>`. Each item has `type` (`image`, `video`, `web`, `text`), `url` or `text`,
 `duration`, `transition`, `name`, for presentations `slide` and `slides`, and for web pages `zoom` and `refreshSeconds`.

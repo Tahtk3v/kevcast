@@ -139,8 +139,11 @@
    * Order: highest priority, then recurring "interrupt" entries, then the most specific
    * target (display > group > everyone), then the most recently created entry.
    * Without an active entry the display's default playlist plays.
+   * `hasContent(key, now)` (optional) says whether that content has something to show at `now`;
+   * active entries whose playlist is empty at that moment are skipped, so a lower-priority entry
+   * (or the default playlist) plays instead of a blank screen.
    */
-  function resolve(schedules, display, now) {
+  function resolve(schedules, display, now, hasContent) {
     now = now || new Date();
     const specificity = (e) => {
       const t = e.targets || {};
@@ -149,7 +152,8 @@
       return 0;
     };
     const active = (schedules || [])
-      .filter((e) => contentKey(e) && appliesToDisplay(e, display) && isActive(e, now))
+      .filter((e) => contentKey(e) && appliesToDisplay(e, display) && isActive(e, now) &&
+        (!hasContent || hasContent(contentKey(e), now)))
       .sort((a, b) =>
         (b.priority || 0) - (a.priority || 0) ||
         Number(hasInterval(b)) - Number(hasInterval(a)) ||
@@ -168,12 +172,12 @@
    * Timeline of one calendar day for a display: [{ from, to, key, scheduleId }] in minutes,
    * sampled every `stepMinutes`. Recurring (interval) entries are left out; see `intervalsOn`.
    */
-  function dayTimeline(schedules, display, date, stepMinutes = 5) {
+  function dayTimeline(schedules, display, date, stepMinutes = 5, hasContent) {
     const base = (schedules || []).filter((e) => !hasInterval(e));
     const segs = [];
     for (let m = 0; m < 1440; m += stepMinutes) {
       const t = new Date(date.getFullYear(), date.getMonth(), date.getDate(), Math.floor(m / 60), m % 60, 30);
-      const r = resolve(base, display, t);
+      const r = resolve(base, display, t, hasContent);
       const last = segs[segs.length - 1];
       if (last && last.key === r.key && last.scheduleId === r.scheduleId) last.to = m + stepMinutes;
       else segs.push({ from: m, to: m + stepMinutes, key: r.key, scheduleId: r.scheduleId });

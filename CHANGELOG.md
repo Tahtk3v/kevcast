@@ -5,6 +5,19 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-24
+### Added
+- **One weekly restart for all screens**, under *Settings → General* (administrators): on/off, day and time. Screens
+  follow it unless they have their own time (*Displays → Settings → Weekly restart → Own time for this screen*);
+  *Use this for all screens* puts every screen back on it. Screens that still had the default (Sunday 03:00) follow
+  the new setting after updating; screens with another time keep it.
+### Fixed
+- **A scheduled playlist with nothing to show no longer blanks the screen.** When the playlist of an active schedule
+  entry is empty at that moment (no items, or none in their *show from / until* period), the next active entry or the
+  default playlist plays instead. The dashboard's "now playing" and the week overview show the same.
+### Changed
+- Electron 45.4.1 for KevCast Player and Studio.
+
 ## [0.9.0] - 2026-11-18
 ### Added
 - **Content that starts or expires, set in the playlist editor.** Click an item (or the date chip under it) to set

@@ -81,6 +81,16 @@ function pruneScheduleTargets({ displayId, group }) {
   ensureGroups(used);
   if (changed || db.list('groups').length !== before) db.saveNow();
 })();
+// Before 0.9.1 every screen stored its own weekly restart; the ones still on the default now follow the
+// server-wide setting (Settings → General), so it can be changed for all screens at once.
+(function migrateMaintenance() {
+  let changed = false;
+  for (const d of db.list('displays')) {
+    const m = d.maintenance;
+    if (m && m.weeklyRestart !== false && Number(m.day) === 0 && m.time === '03:00') { delete d.maintenance; changed = true; }
+  }
+  if (changed) db.saveNow();
+})();
 // 0.2.x had one account in settings.adminUser; it becomes the first administrator.
 (function migrateUsers() {
   const old = db.data.settings.adminUser;
@@ -181,10 +191,17 @@ function groupPlaylist(d) {
 }
 const effectiveDefault = (d) => groupPlaylist(d)?.id || d.defaultPlaylistId || null;
 
+/** Does a playlist (or "media:<id>") have something to show at `now`? The same check the players make. */
+function hasContentAt(key, now) {
+  const p = key.startsWith('media:') ? expandSingle(key.slice(6)) : expandPlaylist(db.get('playlists', key));
+  const t = now.getTime();
+  return !!p && p.items.some((i) => (!i.from || Date.parse(i.from) <= t) && (!i.until || Date.parse(i.until) > t));
+}
+
 function publicDisplay(d) {
   const { token, ...rest } = d;
   const effectivePlaylistId = effectiveDefault(d);
-  const now = resolveSchedule(db.list('schedules'), { ...d, defaultPlaylistId: effectivePlaylistId }, new Date());
+  const now = resolveSchedule(db.list('schedules'), { ...d, defaultPlaylistId: effectivePlaylistId }, new Date(), hasContentAt);
   return {
     ...rest, maintenance: maintenanceOf(d), online: isOnline(d),
     groupPlaylistId: groupPlaylist(d)?.id || null, effectivePlaylistId,
@@ -454,7 +471,6 @@ app.post('/api/player/register', (req, res) => {
     showClock: false,
     ticker: { enabled: false, text: '', speed: 60 },
     background: '#000000',
-    maintenance: { ...DEFAULT_MAINTENANCE },
     resolution: resolution || null,
     userAgent: userAgent || req.get('user-agent'),
     ip: req.ip,
@@ -588,6 +604,8 @@ admin.get('/overview', (req, res) => {
     // Editors can't add screens with the key, so they don't get to see it.
     provisioningKey: req.user.role === 'admin' ? provisioningKey() : null,
     fontReplacements: db.data.settings.fontReplacements || [],
+    maintenance: serverMaintenance(),
+    customRestarts: customRestarts(),
     platform: `${os.type()} ${os.release()}`,
     dataDir: DATA_DIR,
   });
@@ -874,14 +892,23 @@ admin.get('/playlists/:id/preview', (req, res) => {
 // Schedules -------------------------------------------------------------------
 const DEFAULT_MAINTENANCE = { weeklyRestart: true, day: 0, time: '03:00' };
 /** Weekly restart settings of a display (older displays get the default: Sunday 03:00). */
-function maintenanceOf(d) {
-  const m = d.maintenance || {};
+/** How many approved screens have their own weekly restart. */
+const customRestarts = () => db.list('displays').filter((d) => d.approved && d.maintenance).length;
+function cleanMaintenance(m = {}, fallback = DEFAULT_MAINTENANCE) {
   return {
-    weeklyRestart: m.weeklyRestart !== undefined ? !!m.weeklyRestart : DEFAULT_MAINTENANCE.weeklyRestart,
-    day: Number.isInteger(m.day) && m.day >= 0 && m.day <= 6 ? m.day : DEFAULT_MAINTENANCE.day,
-    time: /^\d{2}:\d{2}$/.test(m.time || '') ? m.time : DEFAULT_MAINTENANCE.time,
+    weeklyRestart: m.weeklyRestart !== undefined ? !!m.weeklyRestart : fallback.weeklyRestart,
+    day: Number.isInteger(m.day) && m.day >= 0 && m.day <= 6 ? m.day : fallback.day,
+    time: /^\d{2}:\d{2}$/.test(m.time || '') ? m.time : fallback.time,
   };
 }
+/** The weekly restart for all screens (Settings → General). */
+const serverMaintenance = () => cleanMaintenance(db.data.settings.maintenance || {});
+/** A screen follows the server's weekly restart unless it has its own (`custom`). */
+function maintenanceOf(d) {
+  return d.maintenance ? { ...cleanMaintenance(d.maintenance), custom: true } : { ...serverMaintenance(), custom: false };
+}
+/** A display's own weekly restart from a request: null/false = follow the server setting. */
+const ownMaintenance = (m) => (m ? cleanMaintenance(m) : undefined);
 
 function cleanSchedule(b) {
   const time = (t, def) => (/^\d{1,2}:\d{2}$/.test(t || '') ? t.padStart(5, '0') : def);
@@ -983,7 +1010,7 @@ admin.post('/displays/command', fullAccessOnly, (req, res) => {
 admin.patch('/displays/bulk', fullAccessOnly, (req, res) => {
   const allowed = ['groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'language', 'ticker', 'background', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body?.patch || {}).filter(([k]) => allowed.includes(k)));
-  if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
+  if ('maintenance' in patch) patch.maintenance = ownMaintenance(patch.maintenance);
   if (patch.groups) patch.groups = ensureGroups(patch.groups);
   const add = ensureGroups(req.body?.addGroups || []);
   const remove = (req.body?.removeGroups || []).map(String);
@@ -1005,7 +1032,7 @@ admin.get('/displays/:id/screenshot', (req, res) => {
 admin.patch('/displays/:id', fullAccessOnly, (req, res) => {
   const allowed = ['name', 'groups', 'defaultPlaylistId', 'orientation', 'fit', 'showClock', 'language', 'ticker', 'background', 'notes', 'maintenance'];
   const patch = Object.fromEntries(Object.entries(req.body || {}).filter(([k]) => allowed.includes(k)));
-  if (patch.maintenance) patch.maintenance = maintenanceOf({ maintenance: patch.maintenance });
+  if ('maintenance' in patch) patch.maintenance = ownMaintenance(patch.maintenance);
   if (patch.groups) patch.groups = ensureGroups(Array.isArray(patch.groups) ? patch.groups : []);
   const d = db.update('displays', req.params.id, patch);
   if (!d) return bad(res, 'Not found', 404);
@@ -1141,10 +1168,13 @@ admin.post('/schedules/bulk', (req, res) => {
 // Settings --------------------------------------------------------------------
 admin.patch('/settings', adminOnly, (req, res) => {
   if (req.body?.orgName) db.data.settings.orgName = String(req.body.orgName);
+  // The weekly restart of all screens that don't have their own; `restartForAll` also clears those.
+  if (req.body?.maintenance) db.data.settings.maintenance = cleanMaintenance(req.body.maintenance);
+  if (req.body?.restartForAll) { for (const d of db.list('displays')) delete d.maintenance; db.save('displays'); }
   // One clock format for every screen: automatic (each screen's language), 24-hour or 12-hour.
   if (req.body && 'clockFormat' in req.body) db.data.settings.clockFormat = CLOCK_FORMATS.includes(String(req.body.clockFormat)) ? String(req.body.clockFormat) : 'auto';
   db.save('settings');
-  res.json({ ok: true, orgName: db.data.settings.orgName, clockFormat: clockFormat() });
+  res.json({ ok: true, orgName: db.data.settings.orgName, clockFormat: clockFormat(), maintenance: serverMaintenance(), customRestarts: customRestarts() });
 });
 // Server-wide font replacements for PowerPoint conversion, e.g. [{ from: 'Corporate Sans', to: 'Arial' }].
 // Presentations that use a changed font are converted again.

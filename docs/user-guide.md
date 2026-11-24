@@ -305,7 +305,7 @@ The chips above the cards filter by group (**All**, each group, **No group**).
 | Background | Colour behind images that don't fill the screen |
 | Show clock | Clock in the top-right corner |
 | News ticker | Scrolling text bar at the bottom. One message per line. Speed and colours are adjustable. |
-| Weekly restart | **On by default: every Sunday at 03:00.** For screens running the KevCast Player app. On **Windows** the computer restarts, so pending Windows updates get installed. On macOS and Linux the player app restarts (see [player docs](player.md#weekly-restart)). Choose another day or time, or switch it off. |
+| Weekly restart | **On by default: every Sunday at 03:00.** For screens running the KevCast Player app. On **Windows** the computer restarts, so pending Windows updates get installed. On macOS and Linux the player app restarts (see [player docs](player.md#weekly-restart)). *Like all screens* follows **Settings → General → Weekly restart of the screens**; choose *Own time for this screen* to give this screen another day or time, or switch it off. |
 | Remove | Disconnects the screen. It shows a new pairing code. |
 
 ## Groups
@@ -376,7 +376,8 @@ Everyone sees:
 - **Server**: whether LibreOffice and the slide renderer were found (with install hints), version, platform and data folder.
 
 Administrators also see:
-- **General**: organisation name, shown on idle screens and in the apps, and the **Clock**: *Automatic* (each screen's
+- **General**: organisation name, shown on idle screens and in the apps; the **Weekly restart of the screens** (one day
+  and time for every screen that doesn't have its own, with *Use this for all screens*); and the **Clock**: *Automatic* (each screen's
   language), *24-hour* or *12-hour*, the same on every screen: for the idle screen, the clock in the corner and weather
   and traffic slides.
 - **Users**: see below.

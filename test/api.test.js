@@ -76,12 +76,30 @@ test('full flow', async () => {
   m = (await call('GET', '/api/player/manifest', null, H)).body;
   const single = m.playlists[`media:${ns.id}`];
   assert.deepStrictEqual([single.items.length, single.items[0].type, single.items[0].zoom, single.items[0].refreshSeconds], [1, 'web', 80, 300]);
-  assert.deepStrictEqual(m.display.maintenance, { weeklyRestart: true, day: 0, time: '03:00' });
+  assert.deepStrictEqual(m.display.maintenance, { weeklyRestart: true, day: 0, time: '03:00', custom: false }, 'follows the server setting');
 
   // Weekly restart settings are validated.
   await call('PATCH', `/api/displays/${d.id}`, { maintenance: { weeklyRestart: false, day: 9, time: 'soon' } });
   m = (await call('GET', '/api/player/manifest', null, H)).body;
-  assert.deepStrictEqual(m.display.maintenance, { weeklyRestart: false, day: 0, time: '03:00' });
+  assert.deepStrictEqual(m.display.maintenance, { weeklyRestart: false, day: 0, time: '03:00', custom: true });
+  // One weekly restart for all screens (Settings): screens without their own follow it at once.
+  const reg2 = (await call('POST', '/api/player/register', {})).body;
+  await call('POST', '/api/displays/pair', { code: reg2.pairingCode, name: 'Second' });
+  const s1 = (await call('PATCH', '/api/settings', { maintenance: { weeklyRestart: true, day: 2, time: '04:30' } })).body;
+  assert.deepStrictEqual([s1.maintenance.day, s1.maintenance.time, s1.customRestarts], [2, '04:30', 1]);
+  let m2 = (await call('GET', '/api/player/manifest', null, { 'x-display-token': reg2.token })).body;
+  assert.deepStrictEqual(m2.display.maintenance, { weeklyRestart: true, day: 2, time: '04:30', custom: false });
+  m = (await call('GET', '/api/player/manifest', null, H)).body;
+  assert.strictEqual(m.display.maintenance.custom, true, 'a screen with its own time keeps it');
+  // "Use this for all screens" clears the screens' own times.
+  assert.strictEqual((await call('PATCH', '/api/settings', { restartForAll: true })).body.customRestarts, 0);
+  m = (await call('GET', '/api/player/manifest', null, H)).body;
+  assert.deepStrictEqual(m.display.maintenance, { weeklyRestart: true, day: 2, time: '04:30', custom: false });
+  // A screen goes back to the server setting with maintenance: null.
+  await call('PATCH', `/api/displays/${d.id}`, { maintenance: { weeklyRestart: true, day: 5, time: '01:00' } });
+  await call('PATCH', `/api/displays/${d.id}`, { maintenance: null });
+  assert.strictEqual((await call('GET', '/api/player/manifest', null, H)).body.display.maintenance.custom, false);
+  await call('DELETE', `/api/displays/${(await call('GET', '/api/displays')).body.find((x) => x.name === 'Second').id}`);
 
   // Deleting a scheduled web page also removes its schedule entries.
   await call('DELETE', `/api/media/${ns.id}`);
@@ -207,6 +225,9 @@ test('0.2.x single admin account becomes the first administrator', () => {
 test('a playlist named like a group plays on that group', async () => {
   await call('POST', '/api/login', { username: 'sam', password: 'newpass1' }); // administrator after the users test
   const own = (await call('POST', '/api/playlists', { name: 'Own default' })).body;
+  // Schedule entries only win when their playlist has something to show, so give it an item.
+  const txt = (await call('POST', '/api/media', { type: 'text', text: { title: 'Hello' } })).body;
+  await call('PUT', `/api/playlists/${own.id}`, { items: [{ mediaId: txt.id }] });
   const reg = (await call('POST', '/api/player/register', {})).body;
   const d = (await call('POST', '/api/displays/pair', { code: reg.pairingCode, name: 'Canteen 1', groups: ['Canteen'], defaultPlaylistId: own.id })).body;
   const H = { 'x-display-token': reg.token };

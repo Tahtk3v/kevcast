@@ -1386,6 +1386,15 @@
     return h('div', { class: 'card cal' }, head, scroll);
   }
 
+  /** Does a playlist (or "media:<id>") have something to show at `at`? Empty playlists are skipped by the schedule. */
+  function contentAt(key, at) {
+    if (key.startsWith('media:')) return true;
+    const p = byId(state.playlists, key);
+    const t = at.getTime();
+    return !!p && (p.items || []).some((i) => i.enabled !== false &&
+      (!i.from || Date.parse(i.from) <= t) && (!i.until || Date.parse(i.until) > t));
+  }
+
   /** One row per day showing exactly what a display plays (schedule + default + recurring items). */
   function weekOverview(days, display, picked, label) {
     const today = dkey(new Date());
@@ -1393,7 +1402,7 @@
     const ticks = [0, 3, 6, 9, 12, 15, 18, 21, 24];
     const pct = (m) => `${(m / 1440) * 100}%`;
     const rows = days.map((d) => {
-      const segs = KevSchedule.dayTimeline(state.schedules, target, d, 5);
+      const segs = KevSchedule.dayTimeline(state.schedules, target, d, 5, contentAt);
       const recurring = KevSchedule.intervalsOn(state.schedules, target, d);
       const track = h('div', { class: 'wk-track', title: t('Click to schedule something on this day'), onclick: () => scheduleDialog({ days: [d.getDay()], targets: targetsFor(display) }) });
       segs.forEach((sg) => {
@@ -2117,6 +2126,20 @@
         h('a', { class: 'btn sm ghost', href: '#/schedule', onclick: () => { state.calDisplay = d.id; } }, icon('schedule'), t('Schedule'))));
   }
 
+  const DAY_NAMES = () => [t('Sunday'), t('Monday'), t('Tuesday'), t('Wednesday'), t('Thursday'), t('Friday'), t('Saturday')];
+  /** "Every Sunday at 03:00" or "Off". */
+  const describeRestart = (m) => (m.weeklyRestart ? t('Every {day} at {time}', { day: DAY_NAMES()[m.day], time: m.time }) : t('Off'));
+  /** On/off, day and time of a weekly restart, edited in place on `m`. */
+  function restartFields(m) {
+    const detail = h('div', { class: 'row wrap small', style: { gap: '8px', marginLeft: '26px' }, hidden: !m.weeklyRestart },
+      t('Every'), h('select', { style: { width: 'auto' }, onchange: (e) => (m.day = Number(e.target.value)) },
+        [0, 1, 2, 3, 4, 5, 6].map((n) => h('option', { value: n, selected: n === m.day }, DAY_NAMES()[n]))),
+      t('at'), h('input', { type: 'time', value: m.time, style: { width: 'auto' }, oninput: (e) => (m.time = e.target.value || '03:00') }));
+    return h('div', { class: 'stack', style: { gap: '6px' } },
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: m.weeklyRestart, onchange: (e) => { m.weeklyRestart = e.target.checked; detail.hidden = !e.target.checked; } }), t('Weekly restart')),
+      detail);
+  }
+
   function displayDialog(d) {
     const s = JSON.parse(JSON.stringify(d));
     s.ticker = Object.assign({ enabled: false, text: '', speed: 60, bg: '#111827', fg: '#ffffff' }, s.ticker || {});
@@ -2129,17 +2152,18 @@
         h('label', { class: 'row small' }, t('Text'), h('input', { type: 'color', value: s.ticker.fg, oninput: (e) => (s.ticker.fg = e.target.value) }))));
     tickerBox.hidden = !s.ticker.enabled;
     // Weekly restart (Player app): lets Windows install updates and keeps long-running screens fresh.
-    s.maintenance = Object.assign({ weeklyRestart: true, day: 0, time: '03:00' }, s.maintenance || {});
-    const restartDetail = h('div', { class: 'row wrap small', style: { gap: '8px', marginLeft: '26px' } },
-      t('Every'), h('select', { style: { width: 'auto' }, onchange: (e) => (s.maintenance.day = Number(e.target.value)) },
-        [0, 1, 2, 3, 4, 5, 6].map((n) => h('option', { value: n, selected: n === s.maintenance.day }, [t('Sunday'), t('Monday'), t('Tuesday'), t('Wednesday'), t('Thursday'), t('Friday'), t('Saturday')][n]))),
-      t('at'), h('input', { type: 'time', value: s.maintenance.time, style: { width: 'auto' }, oninput: (e) => (s.maintenance.time = e.target.value || '03:00') }));
-    restartDetail.hidden = !s.maintenance.weeklyRestart;
+    // A screen follows the server-wide setting (Settings → General) unless it has its own time.
+    const serverRestart = state.overview?.maintenance || { weeklyRestart: true, day: 0, time: '03:00' };
+    let ownRestart = !!d.maintenance?.custom;
+    s.maintenance = { weeklyRestart: true, day: 0, time: '03:00', ...(d.maintenance || serverRestart) };
+    const ownFields = restartFields(s.maintenance);
+    ownFields.hidden = !ownRestart;
+    const followText = h('div', { class: 'muted small', style: { marginLeft: '2px' }, hidden: ownRestart }, describeRestart(serverRestart), t(' (for all screens, under Settings → General)'));
     const restartBox = h('div', { class: 'field' },
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: s.maintenance.weeklyRestart, onchange: (e) => { s.maintenance.weeklyRestart = e.target.checked; restartDetail.hidden = !e.target.checked; } }),
-        t('Weekly restart')),
-      restartDetail,
-      h('span', { class: 'hint', style: { marginLeft: '26px' } }, isApp(d)
+      h('b', { class: 'small' }, t('Weekly restart')),
+      segmented([['all', t('Like all screens')], ['own', t('Own time for this screen')]], ownRestart ? 'own' : 'all', (v) => { ownRestart = v === 'own'; ownFields.hidden = !ownRestart; followText.hidden = ownRestart; }),
+      followText, ownFields,
+      h('span', { class: 'hint' }, isApp(d)
         ? t('Windows restarts the computer so updates get installed; on macOS and Linux the player app restarts.')
         : t('Only for screens running the KevCast Player app (this one uses a browser).')));
 
@@ -2171,7 +2195,7 @@
         h('div', { class: 'spacer' }),
         h('button', { class: 'btn', onclick: close }, t('Cancel')),
         h('button', { class: 'btn primary', onclick: async () => {
-          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, groups: s.groups, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, language: s.language || 'auto', ticker: s.ticker, background: s.background, notes: s.notes, maintenance: s.maintenance } });
+          await api(`/displays/${d.id}`, { method: 'PATCH', body: { name: s.name, groups: s.groups, defaultPlaylistId: s.defaultPlaylistId, orientation: s.orientation, fit: s.fit, showClock: s.showClock, language: s.language || 'auto', ticker: s.ticker, background: s.background, notes: s.notes, maintenance: ownRestart ? s.maintenance : null } });
           close(); toast(t('Saved — the screen updates in a moment'), 'ok'); await loadAll(); renderPage();
         } }, t('Save')),
       ],
@@ -2306,6 +2330,17 @@
     const me = state.session.user;
     const org = h('input', { value: state.session.orgName });
     const clock = { value: state.session.clockFormat || 'auto' };
+    const restart = { weeklyRestart: true, day: 0, time: '03:00', ...(o?.maintenance || {}) };
+    delete restart.custom;
+    const customNote = () => (o?.customRestarts ? h('div', { class: 'alert', style: { margin: 0 } },
+      tn(o.customRestarts, '{n} screen has its own time. ', '{n} screens have their own time. '),
+      h('button', { class: 'btn sm', onclick: async () => {
+        try {
+          const r = await api('/settings', { method: 'PATCH', body: { maintenance: restart, restartForAll: true } });
+          Object.assign(o, { maintenance: r.maintenance, customRestarts: r.customRestarts });
+          toast(t('All screens now use this weekly restart'), 'ok'); renderPage({ soft: true });
+        } catch (e) { toast(e.message, 'err'); }
+      } }, t('Use this for all screens'))) : null);
     const cur = h('input', { type: 'password', autocomplete: 'current-password' });
     const nxt = h('input', { type: 'password', autocomplete: 'new-password' });
     const cap = (ok, label, hint) => h('div', { class: 'list-row' }, h('span', { class: `badge ${ok ? 'ok' : 'warn'}` }, ok ? 'OK' : t('Missing')), h('div', {}, h('b', {}, label), h('div', { class: 'muted small' }, ok ? ok : hint)));
@@ -2317,7 +2352,17 @@
             h('label', { class: 'field' }, t('Organisation name'), h('span', { class: 'hint' }, t('Shown on idle screens')), org),
             h('div', { class: 'field' }, h('b', { class: 'small' }, t('Clock')), h('span', { class: 'hint' }, t('The same on every screen: the idle screen, the clock in the corner and weather and traffic slides. Automatic follows each screen’s language.')),
               segmented([['auto', t('Automatic')], ['24', t('24-hour (14:30)')], ['12', t('12-hour (2:30 PM)')]], clock.value, (v) => (clock.value = v))),
-            h('div', {}, h('button', { class: 'btn primary', onclick: async () => { const r = await api('/settings', { method: 'PATCH', body: { orgName: org.value, clockFormat: clock.value } }); state.session.orgName = r.orgName; state.session.clockFormat = r.clockFormat; toast(t('Saved'), 'ok'); } }, t('Save')))) : null,
+            h('div', { class: 'field' }, h('b', { class: 'small' }, t('Weekly restart of the screens')),
+              h('span', { class: 'hint' }, t('For screens with the KevCast Player app: Windows restarts the computer so updates get installed; on macOS and Linux the app restarts. Applies to every screen that doesn’t have its own time.')),
+              restartFields(restart), customNote()),
+            h('div', {}, h('button', { class: 'btn primary', onclick: async () => {
+              try {
+                const r = await api('/settings', { method: 'PATCH', body: { orgName: org.value, clockFormat: clock.value, maintenance: restart } });
+                state.session.orgName = r.orgName; state.session.clockFormat = r.clockFormat;
+                Object.assign(o, { maintenance: r.maintenance, customRestarts: r.customRestarts });
+                toast(t('Saved'), 'ok');
+              } catch (e) { toast(e.message, 'err'); }
+            } }, t('Save')))) : null,
           isAdmin() ? usersCard() : null,
           h('div', { class: 'card pad stack' }, h('h2', {}, t('Your account')),
             h('div', { class: 'muted' }, h('b', {}, me.name), ` (${me.username}) · ${ROLE_LABEL[me.role]}`),

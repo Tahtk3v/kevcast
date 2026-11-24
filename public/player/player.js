@@ -231,7 +231,9 @@
 
   function evaluate(force) {
     if (!manifest || !manifest.display.approved) return;
-    const r = KevSchedule.resolve(manifest.schedules, manifest.display, new Date());
+    // Entries whose playlist has nothing to show right now are skipped (see KevSchedule.resolve).
+    const hasContent = (key, at) => { const p = manifest.playlists[key]; return !!p && p.items.some((i) => live(i, at.getTime())); };
+    const r = KevSchedule.resolve(manifest.schedules, manifest.display, new Date(), hasContent);
     const pl = r.key && manifest.playlists[r.key];
     if (!pl || !pl.items.some((i) => live(i))) {
       if (current.slot) positions[current.slot] = current.index;
