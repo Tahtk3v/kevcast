@@ -4,6 +4,10 @@ All notable changes to KevCast are listed here. The format follows [Keep a Chang
 and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Fixed
+- **A scheduled playlist with nothing to show no longer blanks the screen.** When the playlist of an active schedule
+  entry is empty at that moment (no items, or none in their *show from / until* period), the next active entry or the
+  default playlist plays instead. The dashboard's "now playing" and the week overview show the same.
 
 ## [0.9.0] - 2026-11-18
 ### Added
