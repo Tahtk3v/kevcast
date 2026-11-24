@@ -1386,6 +1386,15 @@
     return h('div', { class: 'card cal' }, head, scroll);
   }
 
+  /** Does a playlist (or "media:<id>") have something to show at `at`? Empty playlists are skipped by the schedule. */
+  function contentAt(key, at) {
+    if (key.startsWith('media:')) return true;
+    const p = byId(state.playlists, key);
+    const t = at.getTime();
+    return !!p && (p.items || []).some((i) => i.enabled !== false &&
+      (!i.from || Date.parse(i.from) <= t) && (!i.until || Date.parse(i.until) > t));
+  }
+
   /** One row per day showing exactly what a display plays (schedule + default + recurring items). */
   function weekOverview(days, display, picked, label) {
     const today = dkey(new Date());
@@ -1393,7 +1402,7 @@
     const ticks = [0, 3, 6, 9, 12, 15, 18, 21, 24];
     const pct = (m) => `${(m / 1440) * 100}%`;
     const rows = days.map((d) => {
-      const segs = KevSchedule.dayTimeline(state.schedules, target, d, 5);
+      const segs = KevSchedule.dayTimeline(state.schedules, target, d, 5, contentAt);
       const recurring = KevSchedule.intervalsOn(state.schedules, target, d);
       const track = h('div', { class: 'wk-track', title: t('Click to schedule something on this day'), onclick: () => scheduleDialog({ days: [d.getDay()], targets: targetsFor(display) }) });
       segs.forEach((sg) => {

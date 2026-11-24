@@ -181,10 +181,17 @@ function groupPlaylist(d) {
 }
 const effectiveDefault = (d) => groupPlaylist(d)?.id || d.defaultPlaylistId || null;
 
+/** Does a playlist (or "media:<id>") have something to show at `now`? The same check the players make. */
+function hasContentAt(key, now) {
+  const p = key.startsWith('media:') ? expandSingle(key.slice(6)) : expandPlaylist(db.get('playlists', key));
+  const t = now.getTime();
+  return !!p && p.items.some((i) => (!i.from || Date.parse(i.from) <= t) && (!i.until || Date.parse(i.until) > t));
+}
+
 function publicDisplay(d) {
   const { token, ...rest } = d;
   const effectivePlaylistId = effectiveDefault(d);
-  const now = resolveSchedule(db.list('schedules'), { ...d, defaultPlaylistId: effectivePlaylistId }, new Date());
+  const now = resolveSchedule(db.list('schedules'), { ...d, defaultPlaylistId: effectivePlaylistId }, new Date(), hasContentAt);
   return {
     ...rest, maintenance: maintenanceOf(d), online: isOnline(d),
     groupPlaylistId: groupPlaylist(d)?.id || null, effectivePlaylistId,

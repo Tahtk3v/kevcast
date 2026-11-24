@@ -207,6 +207,9 @@ test('0.2.x single admin account becomes the first administrator', () => {
 test('a playlist named like a group plays on that group', async () => {
   await call('POST', '/api/login', { username: 'sam', password: 'newpass1' }); // administrator after the users test
   const own = (await call('POST', '/api/playlists', { name: 'Own default' })).body;
+  // Schedule entries only win when their playlist has something to show, so give it an item.
+  const txt = (await call('POST', '/api/media', { type: 'text', text: { title: 'Hello' } })).body;
+  await call('PUT', `/api/playlists/${own.id}`, { items: [{ mediaId: txt.id }] });
   const reg = (await call('POST', '/api/player/register', {})).body;
   const d = (await call('POST', '/api/displays/pair', { code: reg.pairingCode, name: 'Canteen 1', groups: ['Canteen'], defaultPlaylistId: own.id })).body;
   const H = { 'x-display-token': reg.token };

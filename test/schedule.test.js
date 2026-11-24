@@ -91,3 +91,22 @@ test('single media items with their own duration, and the day timeline', () => {
   const tl = dayTimeline([web], display, new Date('2026-11-09T00:00:00'));
   assert.deepStrictEqual(tl.map((s) => [s.from, s.to, s.key]), [[0, 480, 'default'], [480, 600, 'media:ns'], [600, 1440, 'default']]);
 });
+
+test('an active entry whose playlist is empty right now is skipped', () => {
+  const urgent = { id: 'u', playlistId: 'empty', priority: 10, start: '08:00', end: '17:00', createdAt: '2026-01-02' };
+  const normal = { id: 'n', playlistId: 'news', priority: 0, start: '08:00', end: '17:00', createdAt: '2026-01-01' };
+  const now = at('2026-11-09', '10:00');
+  const content = { empty: false, news: true, default: true };
+  const hasContent = (key) => !!content[key];
+  // Without a content check the higher priority wins, even when it has nothing to show.
+  assert.strictEqual(resolve([urgent, normal], display, now).playlistId, 'empty');
+  // With it, the lower-priority playlist plays; and the default when nothing scheduled has content.
+  assert.strictEqual(resolve([urgent, normal], display, now, hasContent).playlistId, 'news');
+  content.news = false;
+  const r = resolve([urgent, normal], display, now, hasContent);
+  assert.deepStrictEqual([r.playlistId, r.scheduleId], ['default', null]);
+  // The week overview uses the same rule.
+  content.news = true;
+  const tl = dayTimeline([urgent, normal], display, new Date('2026-11-09T00:00:00'), 5, hasContent);
+  assert.deepStrictEqual(tl.map((s) => [s.from, s.to, s.key]), [[0, 480, 'default'], [480, 1020, 'news'], [1020, 1440, 'default']]);
+});
