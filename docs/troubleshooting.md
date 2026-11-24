@@ -98,7 +98,7 @@ Many sites (public transport, Google, Microsoft 365, banks, social media) forbid
 - Videos are muted, so they can start without a click. Sound isn't supported yet.
 
 ### The screen restarts on Sunday night
-That's the **weekly restart** (default Sunday 03:00), so Windows updates get installed. Change or switch it off per screen in **Displays → Settings**.
+That's the **weekly restart** (default Sunday 03:00), so Windows updates get installed. Change it or switch it off for all screens under **Settings → General**, or for one screen in **Displays → Settings**.
 
 ### A recurring item (every N minutes) doesn't appear
 - It only shows inside its time window, for *show for* seconds at every *every N minutes*, counted from the window start (07:00, 07:15, 07:30, …).

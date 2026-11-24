@@ -131,8 +131,10 @@ Every screen with the Player app therefore restarts once a week. The default is 
 | **Windows** | The computer restarts, with a one-minute warning, so pending Windows updates get installed. KevCast Player starts again at sign-in. |
 | **macOS / Linux** | The player app restarts. To reboot the whole computer instead, set `rebootCommand` in [player.json](configuration.md#playerjson), e.g. `"sudo /sbin/reboot"` (needs a sudoers rule for the screen user). |
 
-- Change the day and time, or switch it off, per screen in **Displays → Settings → Weekly restart**.
-- For many screens at once, use the API: `PATCH /api/displays/bulk` with `{"group": "Lobby", "patch": {"maintenance": {...}}}` (see [API](api.md#displays-admin)).
+- Set the day and time, or switch it off, **for all screens at once** under **Settings → General → Weekly restart of the
+  screens** (administrators). Screens pick up the change right away.
+- A screen can have its own time: **Displays → Settings → Weekly restart → Own time for this screen**. Choose *Like all
+  screens* to follow the server setting again. *Use this for all screens* in Settings puts every screen back on it.
 - The player remembers the setting, so the restart also happens while the server is unreachable.
 - It runs within 30 minutes of the planned time, at most once that day.
 - Set `"weeklyRestart": false` in `player.json` to forbid restarts on a particular device, whatever the Web Studio says.
